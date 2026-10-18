@@ -25,6 +25,17 @@ interface TvApp {
   name: string;
 }
 
+interface StMode {
+  id: string;
+  name: string;
+  current: boolean;
+}
+
+interface StModes {
+  picture: StMode[];
+  sound: StMode[];
+}
+
 const $ = <T extends HTMLElement>(selector: string): T =>
   document.querySelector(selector) as T;
 
@@ -60,6 +71,13 @@ const searchOverlay = $<HTMLDivElement>("#search-overlay");
 const searchForm = $<HTMLFormElement>("#search-form");
 const searchText = $<HTMLInputElement>("#search-text");
 const searchClose = $<HTMLButtonElement>("#search-close");
+const modesOverlay = $<HTMLDivElement>("#modes-overlay");
+const modesPicture = $<HTMLDivElement>("#modes-picture");
+const modesSound = $<HTMLDivElement>("#modes-sound");
+const modesClose = $<HTMLButtonElement>("#modes-close");
+const recordBtn = $<HTMLButtonElement>("#record-btn");
+const recordGlyph = $<HTMLSpanElement>("#record-glyph");
+const recordLabel = $<HTMLSpanElement>("#record-label");
 const toastStack = $<HTMLDivElement>("#toast-stack");
 
 // Teclas físicas → ação na nuvem
@@ -73,6 +91,10 @@ const CLOUD_KEY_ACTIONS: Record<string, { action: string; arg?: string }> = {
   KEY_PLAY_BACK: { action: "play_pause" },
   KEY_REWIND: { action: "rewind" },
   KEY_FF: { action: "fast_forward" },
+  KEY_STOP: { action: "playback_stop" },
+  KEY_PREV_TRACK: { action: "previous_track" },
+  KEY_NEXT_TRACK: { action: "next_track" },
+  KEY_AMBIENT: { action: "ambient_on" },
   KEY_UP: { action: "remote_key", arg: "UP" },
   KEY_DOWN: { action: "remote_key", arg: "DOWN" },
   KEY_LEFT: { action: "remote_key", arg: "LEFT" },
@@ -95,6 +117,12 @@ const CLOUD_KEY_CAPABILITY: Record<string, string[]> = {
   KEY_PLAY_BACK: ["samsungvd.remoteControl", "mediaPlayback"],
   KEY_REWIND: ["mediaPlayback", "samsungvd.remoteControl"],
   KEY_FF: ["mediaPlayback", "samsungvd.remoteControl"],
+  KEY_STOP: ["mediaPlayback", "samsungvd.remoteControl"],
+  KEY_PREV_TRACK: ["mediaTrackControl"],
+  KEY_NEXT_TRACK: ["mediaTrackControl"],
+  KEY_MODES: ["custom.picturemode", "custom.soundmode"],
+  KEY_RECORD: ["custom.recording"],
+  KEY_AMBIENT: ["samsungvd.ambient"],
   KEY_SOURCE: ["samsungvd.mediaInputSource", "mediaInputSource", "samsungvd.remoteControl"],
   KEY_NUMPAD: ["tvChannel"],
   KEY_SEARCH: ["custom.tvsearch"],
@@ -126,6 +154,7 @@ let cloudCaps: string[] = [];
 let stCollapsed = false;
 let stDeviceLabel: string | null = null;
 let channelValue = "";
+let recording = false;
 
 // ---------------------------------------------------------------------------
 // Utilidades de UI
@@ -216,16 +245,20 @@ function fillStDevices(list: StDevice[]) {
     .join("");
 }
 
-async function stExecute(action: string, arg?: string) {
+async function stExecute(action: string, arg?: string): Promise<boolean> {
   try {
     await invoke("st_execute", { action, arg: arg ?? null });
+    return true;
   } catch (error) {
     toast(String(error), "error");
+    return false;
   }
 }
 
 function launchAppById(appId: string) {
-  void stExecute("launch_app", appId).then(() => toast("App enviado para a TV.", "success"));
+  void stExecute("launch_app", appId).then((ok) => {
+    if (ok) toast("App enviado para a TV.", "success");
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +293,16 @@ function handleKey(key: string) {
 
   if (key === "KEY_SEARCH") {
     openSearchDialog();
+    return;
+  }
+
+  if (key === "KEY_MODES") {
+    void openModesDialog();
+    return;
+  }
+
+  if (key === "KEY_RECORD") {
+    toggleRecording();
     return;
   }
 
@@ -298,6 +341,59 @@ function openSearchDialog() {
   if (!cloudActive) return;
   searchOverlay.classList.remove("hidden");
   searchText.focus();
+}
+
+function updateRecordButton() {
+  recordGlyph.textContent = recording ? "⏹" : "⏺";
+  recordLabel.textContent = recording ? "Parar" : "Gravar";
+  recordBtn.classList.toggle("recording", recording);
+}
+
+function toggleRecording() {
+  if (!cloudActive) return;
+  const next = !recording;
+  recording = next;
+  updateRecordButton();
+
+  void stExecute(next ? "record_start" : "record_stop").then((ok) => {
+    if (ok) {
+      toast(next ? "Gravação iniciada." : "Gravação parada.", "success");
+    } else {
+      recording = !next;
+      updateRecordButton();
+    }
+  });
+}
+
+function renderModes(container: HTMLDivElement, modes: StMode[], action: string) {
+  if (modes.length === 0) {
+    container.innerHTML = "<p class='hint'>Nenhum modo informado pela TV.</p>";
+    return;
+  }
+  container.innerHTML = modes
+    .map(
+      (mode) =>
+        `<button class="input-item mode-item ${mode.current ? "current" : ""}" data-mode-id="${esc(mode.id)}" data-mode-action="${action}">${esc(mode.name)}${mode.current ? " ✓" : ""}</button>`,
+    )
+    .join("");
+}
+
+async function openModesDialog() {
+  if (!cloudActive) return;
+  modesOverlay.classList.remove("hidden");
+  modesPicture.innerHTML = "<p class='hint'>Carregando…</p>";
+  modesSound.innerHTML = "";
+
+  try {
+    const modes = await invoke<StModes>("st_modes");
+    renderModes(modesPicture, modes.picture, "set_picture_mode");
+    renderModes(modesSound, modes.sound, "set_sound_mode");
+  } catch (error) {
+    modesPicture.innerHTML = "";
+    modesSound.innerHTML = "";
+    toast(String(error), "error");
+    modesOverlay.classList.add("hidden");
+  }
 }
 
 async function openInputPicker() {
@@ -404,8 +500,28 @@ channelGo.addEventListener("click", () => {
     return;
   }
   channelOverlay.classList.add("hidden");
-  void stExecute("set_channel", value).then(() => toast(`Canal ${value} enviado.`, "success"));
+  void stExecute("set_channel", value).then((ok) => {
+    if (ok) toast(`Canal ${value} enviado.`, "success");
+  });
 });
+
+modesOverlay.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  if (target === modesOverlay) {
+    modesOverlay.classList.add("hidden");
+    return;
+  }
+  const button = target.closest<HTMLButtonElement>("[data-mode-id]");
+  const id = button?.dataset.modeId;
+  const action = button?.dataset.modeAction;
+  if (!id || !action) return;
+  modesOverlay.classList.add("hidden");
+  void stExecute(action, id).then((ok) => {
+    if (ok) toast("Modo alterado.", "success");
+  });
+});
+
+modesClose.addEventListener("click", () => modesOverlay.classList.add("hidden"));
 
 // Busca na TV
 searchOverlay.addEventListener("click", (event) => {
@@ -420,7 +536,9 @@ searchForm.addEventListener("submit", (event) => {
   if (!text) return;
   searchOverlay.classList.add("hidden");
   searchText.value = "";
-  void stExecute("tv_search", text).then(() => toast("Busca enviada para a TV.", "success"));
+  void stExecute("tv_search", text).then((ok) => {
+    if (ok) toast("Busca enviada para a TV.", "success");
+  });
 });
 
 appGrid.addEventListener("click", (event) => {

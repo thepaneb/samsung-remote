@@ -705,6 +705,25 @@ body {
   margin-top: 12px;
 }
 
+.key.pill.recording {
+  color: #fff;
+  background: linear-gradient(180deg, #f05252, #c62b2b);
+  border-color: #a92020;
+}
+
+.modes-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.modes-list .mode-item {
+  flex: 1 1 40%;
+  text-align: center;
+  padding: 12px 10px;
+}
+
 /* cores */
 .key.dot {
   width: 34px;

@@ -119,6 +119,9 @@
             </div>
 
             <div class="row row-pills">
+              <button class="key pill" data-key="KEY_PREV_TRACK" title="Faixa anterior">
+                <span class="glyph">⏮</span>
+              </button>
               <button class="key pill" data-key="KEY_REWIND" title="Retroceder">
                 <span class="glyph">⏪</span>
               </button>
@@ -128,6 +131,12 @@
               <button class="key pill" data-key="KEY_FF" title="Avançar">
                 <span class="glyph">⏩</span>
               </button>
+              <button class="key pill" data-key="KEY_NEXT_TRACK" title="Próxima faixa">
+                <span class="glyph">⏭</span>
+              </button>
+              <button class="key pill" data-key="KEY_STOP" title="Parar">
+                <span class="glyph">⏹</span>
+              </button>
             </div>
 
             <div class="row row-pills">
@@ -136,6 +145,18 @@
               </button>
               <button class="key pill wide" data-key="KEY_SEARCH" title="Buscar na TV">
                 <span class="glyph">🔍</span><span class="mini">Buscar</span>
+              </button>
+            </div>
+
+            <div class="row row-pills">
+              <button class="key pill" data-key="KEY_MODES" title="Modos de imagem e som">
+                <span class="glyph">🎨</span><span class="mini">Modos</span>
+              </button>
+              <button class="key pill" id="record-btn" data-key="KEY_RECORD" title="Gravar / parar gravação">
+                <span class="glyph" id="record-glyph">⏺</span><span class="mini" id="record-label">Gravar</span>
+              </button>
+              <button class="key pill" data-key="KEY_AMBIENT" title="Ativar modo ambiente">
+                <span class="glyph">🌙</span><span class="mini">Ambiente</span>
               </button>
             </div>
           </div>
@@ -221,6 +242,19 @@
         <p class="hint">
           A TV abre a tela de busca com o texto preenchido (funciona como o teclado da TV).
         </p>
+      </div>
+    </div>
+
+    <div class="input-overlay hidden" id="modes-overlay">
+      <div class="input-menu card">
+        <div class="card-head">
+          <h2>Imagem e som</h2>
+          <button class="btn ghost" id="modes-close">×</button>
+        </div>
+        <p class="hint">Modo de imagem</p>
+        <div class="modes-list" id="modes-picture"></div>
+        <p class="hint">Modo de som</p>
+        <div class="modes-list" id="modes-sound"></div>
       </div>
     </div>
 

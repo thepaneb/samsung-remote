@@ -78,6 +78,21 @@ pub struct StChannel {
     pub name: Option<String>,
 }
 
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StMode {
+    pub id: String,
+    pub name: String,
+    pub current: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StModes {
+    pub picture: Vec<StMode>,
+    pub sound: Vec<StMode>,
+}
+
 // ---------------------------------------------------------------------------
 // Persistência
 // ---------------------------------------------------------------------------
@@ -575,6 +590,76 @@ pub async fn channel_info(app: &AppHandle) -> Result<StChannel, String> {
     })
 }
 
+/// Modos de imagem e som suportados pela TV (com o atual marcado).
+pub async fn modes_info(app: &AppHandle) -> Result<StModes, String> {
+    let cfg = load(app);
+
+    let picture = if has_cap(&cfg, "custom.picturemode") {
+        read_modes(
+            &cfg,
+            "custom.picturemode",
+            "supportedPictureModesMap",
+            "pictureMode",
+        )
+        .await
+        .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    let sound = if has_cap(&cfg, "custom.soundmode") {
+        read_modes(
+            &cfg,
+            "custom.soundmode",
+            "supportedSoundModesMap",
+            "soundMode",
+        )
+        .await
+        .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    Ok(StModes { picture, sound })
+}
+
+async fn read_modes(
+    cfg: &StConfig,
+    capability: &str,
+    map_attribute: &str,
+    value_attribute: &str,
+) -> Result<Vec<StMode>, String> {
+    let (token, device_id) = require_token_device(cfg)?;
+    let component = component_for(cfg, capability);
+
+    let (map, _) =
+        get_status_tracked(&token, &device_id, &component, capability, map_attribute).await?;
+    let (current, _) =
+        get_status_tracked(&token, &device_id, &component, capability, value_attribute).await?;
+    let current = current.and_then(|v| v.as_str().map(str::to_string));
+
+    let modes = map
+        .and_then(|v| serde_json::from_value::<Vec<Value>>(v).ok())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    let id = item.get("id").and_then(|v| v.as_str())?.to_string();
+                    let name = item
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(id.as_str())
+                        .to_string();
+                    let current = current.as_deref() == Some(name.as_str());
+                    Some(StMode { id, name, current })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(modes)
+}
+
 // ---------------------------------------------------------------------------
 // Execução de ações (tecla → capacidade)
 // ---------------------------------------------------------------------------
@@ -771,6 +856,71 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
                 "search".to_string(),
                 vec![Value::String(query), Value::String(String::new())],
             )
+        }
+
+        "set_picture_mode" => {
+            if !has_cap(&cfg, "custom.picturemode") {
+                return Err("Modos de imagem não disponíveis nesta TV.".into());
+            }
+            let mode = arg.ok_or("Modo de imagem ausente")?;
+            (
+                "custom.picturemode",
+                "setPictureMode".to_string(),
+                vec![Value::String(mode)],
+            )
+        }
+
+        "set_sound_mode" => {
+            if !has_cap(&cfg, "custom.soundmode") {
+                return Err("Modos de som não disponíveis nesta TV.".into());
+            }
+            let mode = arg.ok_or("Modo de som ausente")?;
+            (
+                "custom.soundmode",
+                "setSoundMode".to_string(),
+                vec![Value::String(mode)],
+            )
+        }
+
+        "previous_track" | "next_track" => {
+            if !has_cap(&cfg, "mediaTrackControl") {
+                return Err("Troca de faixa não disponível nesta TV.".into());
+            }
+            let command = if action == "previous_track" {
+                "previousTrack"
+            } else {
+                "nextTrack"
+            };
+            ("mediaTrackControl", command.to_string(), vec![])
+        }
+
+        "playback_stop" => {
+            if has_cap(&cfg, "samsungvd.remoteControl") {
+                remote_key_attempt("STOP")?
+            } else if has_cap(&cfg, "mediaPlayback") {
+                ("mediaPlayback", "stop".to_string(), vec![])
+            } else {
+                return Err("Parar não disponível no modo nuvem para esta TV.".into());
+            }
+        }
+
+        "record_start" | "record_stop" => {
+            if !has_cap(&cfg, "custom.recording") {
+                return Err("Gravação não disponível nesta TV.".into());
+            }
+            let command = if action == "record_start" {
+                "recordStart"
+            } else {
+                "recordStop"
+            };
+            ("custom.recording", command.to_string(), vec![])
+        }
+
+        "ambient_on" => {
+            if !has_cap(&cfg, "samsungvd.ambient") {
+                return Err("Modo ambiente não disponível nesta TV.".into());
+            }
+            ("samsungvd.ambient", "setAmbientOn".to_string(), vec![])
         }
 
         "launch_app" => {
