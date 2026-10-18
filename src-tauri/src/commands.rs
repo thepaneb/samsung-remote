@@ -100,3 +100,8 @@ pub async fn st_channel(app: AppHandle) -> Result<smartthings::StChannel, String
 pub async fn st_modes(app: AppHandle) -> Result<smartthings::StModes, String> {
     smartthings::modes_info(&app).await
 }
+
+#[tauri::command]
+pub async fn st_about(app: AppHandle) -> Result<smartthings::StAbout, String> {
+    smartthings::about_info(&app).await
+}

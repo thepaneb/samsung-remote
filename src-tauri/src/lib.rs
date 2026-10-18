@@ -16,6 +16,7 @@ pub fn run() {
             commands::st_inputs,
             commands::st_channel,
             commands::st_modes,
+            commands::st_about,
         ])
         .setup(|app| {
             if let Ok(dir) = app.path().app_data_dir() {

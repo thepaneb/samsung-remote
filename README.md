@@ -18,6 +18,9 @@ local (WebSocket).
 - ⏮⏭ **Faixa anterior/próxima** e ⏹ **parar**
 - ⏺ **Gravação PVR** (botão alterna iniciar/parar; requer pendrive/HD na TV)
 - 🌙 **Modo ambiente** (`setAmbientOn`; pressione Home na TV para sair)
+- ⭐ **Favoritos** — atalhos configuráveis para canais ou apps (salvos no aparelho)
+- ℹ️ **Sobre a TV** — modelo, sistema, firmware e suporte a ligar pela nuvem
+- 📳 **Vibração** nos botões (Android)
 - 🚀 **Atalhos de apps** (Netflix, YouTube, Prime Video, Disney+, Globoplay, Max, Spotify, Internet)
   + campo para abrir qualquer app por ID
 - 📺 **Samsung TV Plus** — atalho que sintoniza o **canal 2000** (primeiro canal do TV Plus no Brasil)
@@ -129,6 +132,7 @@ dispositivo é descoberto ao selecionar a TV e salvo em `smartthings.json` (past
 | TV não aparece na lista | Confirme que ela está adicionada no app SmartThings. A lista mostra primeiro os dispositivos com cara de TV; se nada bater, mostra todos. |
 | Atalho abre o app errado | IDs variam por região/ano — use o campo de ID personalizado com o código correto do seu modelo. |
 | Tecla apagada | A TV não expõe a capacidade correspondente no SmartThings; não há como enviar essa tecla pela nuvem. |
+| Guia/Canais não existem no app | O canal de controle da nuvem valida as teclas e aceita apenas: UP, DOWN, LEFT, RIGHT, OK, BACK, EXIT, MENU, HOME, MUTE, PLAY, PAUSE, STOP, REWIND, FF, PLAY_BACK, SOURCE. Guia, lista de canais, números e teclas coloridas só funcionariam com o pareamento local. |
 | Comando não faz efeito | Verifique se a TV está ligada e conectada à internet (o caminho é pela nuvem do SmartThings). |
 | O indicador de entrada atual não acompanha trocas feitas direto na TV | Nesses modelos a nuvem congela o estado de entrada/energia. O app mantém memória própria das últimas ações feitas **por ele** e sincroniza quando a nuvem atualiza. |
 | Power alterna ao contrário (1º clique não faz o esperado) | Mesma causa acima — o app alterna com base no último estado conhecido; um clique extra resolve. |

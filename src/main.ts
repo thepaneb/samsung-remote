@@ -36,6 +36,26 @@ interface StModes {
   sound: StMode[];
 }
 
+interface StAbout {
+  label?: string | null;
+  name?: string | null;
+  manufacturer?: string | null;
+  deviceType?: string | null;
+  model?: string | null;
+  platform?: string | null;
+  platformOs?: string | null;
+  firmware?: string | null;
+  powerOnByOcf?: string | null;
+  capabilities: number;
+}
+
+interface Favorite {
+  id: string;
+  name: string;
+  type: "channel" | "app";
+  value: string;
+}
+
 const $ = <T extends HTMLElement>(selector: string): T =>
   document.querySelector(selector) as T;
 
@@ -78,7 +98,27 @@ const modesClose = $<HTMLButtonElement>("#modes-close");
 const recordBtn = $<HTMLButtonElement>("#record-btn");
 const recordGlyph = $<HTMLSpanElement>("#record-glyph");
 const recordLabel = $<HTMLSpanElement>("#record-label");
+const favGrid = $<HTMLDivElement>("#fav-grid");
+const favEmpty = $<HTMLParagraphElement>("#fav-empty");
+const favAdd = $<HTMLButtonElement>("#fav-add");
+const favOverlay = $<HTMLDivElement>("#fav-overlay");
+const favClose = $<HTMLButtonElement>("#fav-close");
+const favForm = $<HTMLFormElement>("#fav-form");
+const favName = $<HTMLInputElement>("#fav-name");
+const favType = $<HTMLSelectElement>("#fav-type");
+const favValue = $<HTMLInputElement>("#fav-value");
+const favList = $<HTMLDivElement>("#fav-list");
+const aboutRows = $<HTMLDivElement>("#about-rows");
+const aboutRefresh = $<HTMLButtonElement>("#about-refresh");
 const toastStack = $<HTMLDivElement>("#toast-stack");
+
+const isAndroid = /Android/i.test(navigator.userAgent);
+
+function vibrate() {
+  if (isAndroid && "vibrate" in navigator) {
+    navigator.vibrate(8);
+  }
+}
 
 // Teclas físicas → ação na nuvem
 const CLOUD_KEY_ACTIONS: Record<string, { action: string; arg?: string }> = {
@@ -156,6 +196,20 @@ let stCollapsed = false;
 let stDeviceLabel: string | null = null;
 let channelValue = "";
 let recording = false;
+
+const FAV_KEY = "samsungremote.favorites";
+const TV_PLUS_LAST = "samsungremote.tvplus.last";
+
+function loadFavorites(): Favorite[] {
+  try {
+    const raw = localStorage.getItem(FAV_KEY);
+    return raw ? (JSON.parse(raw) as Favorite[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+let favorites: Favorite[] = loadFavorites();
 
 // ---------------------------------------------------------------------------
 // Utilidades de UI
@@ -257,17 +311,137 @@ async function stExecute(action: string, arg?: string): Promise<boolean> {
 }
 
 function launchAppById(appId: string) {
-  // O Samsung TV Plus (canais gratuitos) é acessado pelo canal 2000 na TV.
+  // O Samsung TV Plus (canais gratuitos) é acessado pelo canal 2000 na TV;
+  // usamos o último canal >= 2000 sintonizado quando conhecido.
   if (appId === "tv_plus") {
-    void stExecute("set_channel", "2000").then((ok) => {
-      if (ok) toast("Abrindo o Samsung TV Plus (canal 2000).", "success");
-    });
+    void openTvPlus();
     return;
   }
 
   void stExecute("launch_app", appId).then((ok) => {
     if (ok) toast("App enviado para a TV.", "success");
   });
+}
+
+// ---------------------------------------------------------------------------
+// Favoritos
+// ---------------------------------------------------------------------------
+
+function saveFavorites() {
+  localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+}
+
+function rememberTvPlus(value: string) {
+  const num = Number(value.split(".")[0]);
+  if (Number.isFinite(num) && num >= 2000) {
+    localStorage.setItem(TV_PLUS_LAST, value);
+  }
+}
+
+function renderFavorites() {
+  favGrid.innerHTML = favorites
+    .map(
+      (fav) =>
+        `<button class="app-tile" data-fav-id="${esc(fav.id)}" title="${esc(fav.type === "channel" ? `Canal ${fav.value}` : `App ${fav.value}`)}"><span class="app-fallback">${esc(fav.name.slice(0, 1).toUpperCase() || "?")}</span><span class="app-name">${esc(fav.name)}</span></button>`,
+    )
+    .join("");
+  favEmpty.classList.toggle("hidden", favorites.length > 0);
+}
+
+function renderFavList() {
+  favList.innerHTML =
+    favorites.length === 0
+      ? "<p class='hint'>Nenhum favorito ainda.</p>"
+      : favorites
+          .map(
+            (fav) =>
+              `<div class="fav-row"><span>${esc(fav.name)} — ${fav.type === "channel" ? `canal ${esc(fav.value)}` : `app ${esc(fav.value)}`}</span><button class="btn ghost" data-fav-remove="${esc(fav.id)}" title="Remover">×</button></div>`,
+          )
+          .join("");
+}
+
+async function runFavorite(fav: Favorite) {
+  if (fav.type === "channel") {
+    const ok = await stExecute("set_channel", fav.value);
+    if (ok) {
+      rememberTvPlus(fav.value);
+      toast(`Canal ${fav.value}`, "success");
+    }
+    return;
+  }
+  launchAppById(fav.value);
+}
+
+function openFavoriteDialog() {
+  if (!cloudActive) {
+    toast("Conecte-se ao SmartThings primeiro.", "info");
+    return;
+  }
+  favOverlay.classList.remove("hidden");
+  renderFavList();
+  favName.focus();
+}
+
+async function openTvPlus() {
+  if (!cloudActive) return;
+  let target = localStorage.getItem(TV_PLUS_LAST) ?? "2000";
+
+  try {
+    const info = await invoke<{ current: string | null; name: string | null }>("st_channel");
+    const current = info.current;
+    if (current) {
+      const num = Number(current.split(".")[0]);
+      if (Number.isFinite(num) && num >= 2000) {
+        target = current;
+      }
+    }
+  } catch {
+    // mantém o último canal memorizado
+  }
+
+  const ok = await stExecute("set_channel", target);
+  if (ok) {
+    localStorage.setItem(TV_PLUS_LAST, target);
+    toast(`TV Plus: canal ${target}`, "success");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Sobre a TV
+// ---------------------------------------------------------------------------
+
+async function loadAbout() {
+  if (!cloudActive) {
+    aboutRows.innerHTML = '<p class="hint">Conecte-se ao SmartThings para ver as informações.</p>';
+    return;
+  }
+  aboutRows.innerHTML = '<p class="hint">Carregando…</p>';
+  try {
+    const about = await invoke<StAbout>("st_about");
+    const rows: Array<[string, string | null | undefined]> = [
+      ["Nome", about.name],
+      ["Apelido", about.label],
+      ["Fabricante", about.manufacturer],
+      ["Modelo", about.model],
+      ["Tipo", about.deviceType],
+      ["Sistema", [about.platform, about.platformOs].filter(Boolean).join(" • ")],
+      ["Firmware", about.firmware],
+      [
+        "Ligar pela nuvem",
+        about.powerOnByOcf === "true" ? "Sim" : about.powerOnByOcf === "false" ? "Não" : null,
+      ],
+      ["Capacidades", String(about.capabilities)],
+    ];
+    aboutRows.innerHTML = rows
+      .filter(([, value]) => !!value)
+      .map(
+        ([key, value]) =>
+          `<div class="about-row"><span>${esc(key)}</span><b>${esc(String(value))}</b></div>`,
+      )
+      .join("");
+  } catch (error) {
+    aboutRows.innerHTML = `<p class="hint">${esc(String(error))}</p>`;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -509,6 +683,7 @@ channelGo.addEventListener("click", () => {
     return;
   }
   channelOverlay.classList.add("hidden");
+  rememberTvPlus(value);
   void stExecute("set_channel", value).then((ok) => {
     if (ok) toast(`Canal ${value} enviado.`, "success");
   });
@@ -531,6 +706,61 @@ modesOverlay.addEventListener("click", (event) => {
 });
 
 modesClose.addEventListener("click", () => modesOverlay.classList.add("hidden"));
+
+// Favoritos
+favAdd.addEventListener("click", openFavoriteDialog);
+favClose.addEventListener("click", () => favOverlay.classList.add("hidden"));
+favOverlay.addEventListener("click", (event) => {
+  if (event.target === favOverlay) favOverlay.classList.add("hidden");
+});
+
+favForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const name = favName.value.trim();
+  const value = favValue.value.trim();
+  const type = favType.value === "app" ? "app" : "channel";
+  if (!value) {
+    toast("Informe o canal ou o ID do app.", "info");
+    return;
+  }
+  favorites.push({
+    id: crypto.randomUUID?.() ?? String(Date.now()),
+    name: name || (type === "channel" ? `Canal ${value}` : "App"),
+    type,
+    value,
+  });
+  saveFavorites();
+  renderFavorites();
+  renderFavList();
+  favName.value = "";
+  favValue.value = "";
+  toast("Favorito salvo.", "success");
+});
+
+favList.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-fav-remove]");
+  const id = button?.dataset.favRemove;
+  if (!id) return;
+  favorites = favorites.filter((fav) => fav.id !== id);
+  saveFavorites();
+  renderFavorites();
+  renderFavList();
+});
+
+favGrid.addEventListener("click", (event) => {
+  const tile = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-fav-id]");
+  const id = tile?.dataset.favId;
+  if (!id) return;
+  const fav = favorites.find((item) => item.id === id);
+  if (fav) void runFavorite(fav);
+});
+
+aboutRefresh.addEventListener("click", () => void loadAbout());
+
+// Vibração leve nos botões (Android)
+document.addEventListener("pointerdown", (event) => {
+  if ((event.target as HTMLElement).closest("button")) vibrate();
+});
 
 // Busca na TV
 searchOverlay.addEventListener("click", (event) => {
@@ -621,6 +851,7 @@ stToggle.addEventListener("click", () => {
 
 async function init() {
   renderApps(APP_PRESETS);
+  renderFavorites();
 
   try {
     const status = await invoke<StStatus>("st_status");
@@ -632,6 +863,7 @@ async function init() {
         toast(String(error), "error");
       }
     }
+    await loadAbout();
   } catch (error) {
     toast(String(error), "error");
   }

@@ -109,7 +109,9 @@ body {
   grid-template-columns: 390px minmax(0, 1fr);
   grid-template-areas:
     "st remote"
-    "apps remote";
+    "fav remote"
+    "apps remote"
+    "about remote";
   gap: 16px;
   align-items: start;
 }
@@ -118,12 +120,20 @@ body {
   grid-area: st;
 }
 
+#favorites-card {
+  grid-area: fav;
+}
+
 #remote-card {
   grid-area: remote;
 }
 
 #apps-card {
   grid-area: apps;
+}
+
+#about-card {
+  grid-area: about;
 }
 
 .st-head-info {
@@ -142,7 +152,7 @@ body {
     align-items: stretch;
   }
 
-  /* No celular: painel SmartThings (compacto) → controle → apps */
+  /* No celular: painel SmartThings (compacto) → controle → favoritos → apps → sobre */
   #st-card {
     order: 0;
   }
@@ -151,8 +161,16 @@ body {
     order: 1;
   }
 
-  #apps-card {
+  #favorites-card {
     order: 2;
+  }
+
+  #apps-card {
+    order: 3;
+  }
+
+  #about-card {
+    order: 4;
   }
 }
 
@@ -722,6 +740,94 @@ body {
   flex: 1 1 40%;
   text-align: center;
   padding: 12px 10px;
+}
+
+/* ------------------------------------------------------------- favoritos */
+
+.fav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #0e1422;
+  border: 1px solid var(--key-border);
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.fav-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#fav-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#fav-form > input,
+#fav-form .inline-form input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--key-border);
+  background: #0d1320;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+#fav-form > input:focus,
+#fav-form .inline-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+}
+
+#fav-form .inline-form {
+  margin-bottom: 0;
+}
+
+/* --------------------------------------------------------------- sobre */
+
+.about-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.about-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 2px;
+  border-bottom: 1px dashed rgba(44, 58, 85, 0.55);
+  font-size: 0.82rem;
+}
+
+.about-row:last-child {
+  border-bottom: none;
+}
+
+.about-row span {
+  color: var(--text-dim);
+}
+
+.about-row b {
+  text-align: right;
+  font-weight: 600;
+  word-break: break-word;
 }
 
 /* cores */

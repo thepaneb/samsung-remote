@@ -93,6 +93,21 @@ pub struct StModes {
     pub sound: Vec<StMode>,
 }
 
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StAbout {
+    pub label: Option<String>,
+    pub name: Option<String>,
+    pub manufacturer: Option<String>,
+    pub device_type: Option<String>,
+    pub model: Option<String>,
+    pub platform: Option<String>,
+    pub platform_os: Option<String>,
+    pub firmware: Option<String>,
+    pub power_on_by_ocf: Option<String>,
+    pub capabilities: usize,
+}
+
 // ---------------------------------------------------------------------------
 // Persistência
 // ---------------------------------------------------------------------------
@@ -658,6 +673,69 @@ async fn read_modes(
         .unwrap_or_default();
 
     Ok(modes)
+}
+
+/// Informações da TV para a tela "Sobre".
+pub async fn about_info(app: &AppHandle) -> Result<StAbout, String> {
+    let cfg = load(app);
+    let (token, device_id) = require_token_device(&cfg)?;
+
+    let response = client()?
+        .get(format!("{API}/devices/{device_id}"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| format!("Falha ao consultar a TV: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "SmartThings respondeu {} ao consultar a TV.",
+            response.status()
+        ));
+    }
+
+    let value: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Resposta inesperada: {e}"))?;
+
+    let text = |v: &Value, key: &str| {
+        v.get(key)
+            .and_then(|x| x.as_str())
+            .map(str::to_string)
+            .filter(|s| !s.is_empty())
+    };
+
+    let ocf = value.get("ocf").cloned().unwrap_or(Value::Null);
+
+    let power_on_by_ocf = if has_cap(&cfg, "samsungvd.supportsPowerOnByOcf") {
+        let component = component_for(&cfg, "samsungvd.supportsPowerOnByOcf");
+        get_status(
+            &token,
+            &device_id,
+            &component,
+            "samsungvd.supportsPowerOnByOcf",
+            "supportsPowerOnByOcf",
+        )
+        .await
+        .ok()
+        .flatten()
+    } else {
+        None
+    };
+
+    Ok(StAbout {
+        label: text(&value, "label"),
+        name: text(&value, "name"),
+        manufacturer: text(&value, "manufacturerName"),
+        device_type: text(&value, "deviceTypeName"),
+        model: text(&ocf, "modelNumber"),
+        platform: text(&ocf, "platformVersion"),
+        platform_os: text(&ocf, "platformOS"),
+        firmware: text(&ocf, "firmwareVersion"),
+        power_on_by_ocf,
+        capabilities: cfg.capabilities.len(),
+    })
 }
 
 // ---------------------------------------------------------------------------

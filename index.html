@@ -167,6 +167,17 @@
           </p>
         </section>
 
+        <section class="card" id="favorites-card">
+          <div class="card-head">
+            <h2>Favoritos</h2>
+            <button class="btn" id="fav-add">Adicionar</button>
+          </div>
+          <div class="app-grid" id="fav-grid"></div>
+          <p class="empty" id="fav-empty">
+            Crie atalhos para seus canais e apps. Toque em “Adicionar”.
+          </p>
+        </section>
+
         <section class="card" id="apps-card">
           <div class="card-head">
             <h2>Atalhos de apps</h2>
@@ -184,6 +195,16 @@
           <p class="hint">
             Os IDs variam por região/ano da TV. Se algum abrir o app errado, tente outro ID.
           </p>
+        </section>
+
+        <section class="card" id="about-card">
+          <div class="card-head">
+            <h2>Sobre a TV</h2>
+            <button class="btn" id="about-refresh">Atualizar</button>
+          </div>
+          <div class="about-rows" id="about-rows">
+            <p class="hint">Carregando…</p>
+          </div>
         </section>
       </main>
     </div>
@@ -255,6 +276,28 @@
         <div class="modes-list" id="modes-picture"></div>
         <p class="hint">Modo de som</p>
         <div class="modes-list" id="modes-sound"></div>
+      </div>
+    </div>
+
+    <div class="input-overlay hidden" id="fav-overlay">
+      <div class="input-menu card">
+        <div class="card-head">
+          <h2>Favorito</h2>
+          <button class="btn ghost" id="fav-close">×</button>
+        </div>
+        <form id="fav-form">
+          <input id="fav-name" placeholder="Nome (ex.: TV Plus, Notícias)" autocomplete="off" />
+          <div class="inline-form">
+            <select id="fav-type">
+              <option value="channel">Canal</option>
+              <option value="app">App (ID)</option>
+            </select>
+            <input id="fav-value" placeholder="2000 ou 11101200001" autocomplete="off" />
+          </div>
+          <button class="btn primary full" type="submit">Salvar favorito</button>
+        </form>
+        <p class="hint" style="margin-top: 14px">Favoritos existentes</p>
+        <div class="fav-list" id="fav-list"></div>
       </div>
     </div>
 
