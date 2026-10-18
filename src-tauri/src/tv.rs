@@ -367,7 +367,11 @@ pub async fn establish(
                     continue;
                 }
                 return Err(
-                    "A TV recusou a conexão. Tente novamente e aceite o pedido de permissão na tela."
+                    "A TV recusou a conexão sem exibir o pedido de permissão. \
+                     Isso costuma acontecer quando a lista de dispositivos da TV está cheia ou com \
+                     entradas bloqueadas. Na TV, abra Configurações → Geral → Gerenciador de \
+                     Dispositivos Externos → Gerenciador de Conexão de Dispositivos → Lista de \
+                     Dispositivos, remova dispositivos antigos e tente conectar de novo."
                         .to_string(),
                 );
             }
