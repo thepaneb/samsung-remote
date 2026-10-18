@@ -70,6 +70,10 @@ Teclas disponíveis no modo nuvem (dependem das capacidades que a TV expõe): **
 (ciclo) e **abrir apps** (com IDs predefinidos ou um ID digitado). Teclas de navegação (D-pad),
 menu, números e texto existem apenas no modo local.
 
+> Os **IDs de apps** variam por região/ano da TV. Se algum atalho abrir o app errado, use o campo
+> de **ID personalizado** com o código correto para o seu modelo (veja a lista da comunidade em
+> `APPLICATIONS.md` do projeto samsung-tv-ws-api).
+
 ## Solução de problemas
 
 | Problema | O que fazer |
