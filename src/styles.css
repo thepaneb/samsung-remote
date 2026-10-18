@@ -139,6 +139,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    align-items: stretch;
   }
 
   /* No celular: painel SmartThings (compacto) → controle → apps */
@@ -773,9 +774,31 @@ code {
     padding: 13px;
   }
 
+  /* D-pad em uma linha; canal e volume juntos na de baixo */
   .row-main {
-    padding: 4px;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "dpad dpad"
+      "ch vol";
+    align-items: center;
+    gap: 14px 16px;
+    padding: 4px 0;
+  }
+
+  .row-main .dpad {
+    grid-area: dpad;
+    justify-self: center;
+  }
+
+  .row-main .rocker-ch {
+    grid-area: ch;
+    justify-self: end;
+  }
+
+  .row-main .rocker-vol {
+    grid-area: vol;
+    justify-self: start;
   }
 
   .key.round {
