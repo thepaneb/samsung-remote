@@ -20,6 +20,7 @@ local (WebSocket).
 - 🌙 **Modo ambiente** (`setAmbientOn`; pressione Home na TV para sair)
 - 🚀 **Atalhos de apps** (Netflix, YouTube, Prime Video, Disney+, Globoplay, Max, Spotify, Internet)
   + campo para abrir qualquer app por ID
+- 📺 **Samsung TV Plus** — atalho que sintoniza o **canal 2000** (primeiro canal do TV Plus no Brasil)
 - ⌨️ **Atalhos de teclado**: setas = navegar • Enter = OK • Backspace = voltar • `+`/`−` volume •
   `M` mudo • `Espaço`/`P` play-pause • `H` início
 - 🔒 Token salvo localmente (você pode removê-lo a qualquer momento no próprio app)
