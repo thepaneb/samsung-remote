@@ -58,7 +58,7 @@ Os artefatos ficam em `src-tauri/target/release/bundle` (`.msi`/`.exe` no Window
 | --- | --- |
 | Nenhuma TV encontrada | Confirme que a TV está ligada e na mesma rede; adicione pelo IP manualmente (TV: Configurações → Geral → Rede → Status da rede). |
 | “A TV recusou a conexão” | Clique em **✕ (Esquecer)** e conecte de novo para gerar um novo pedido de permissão na TV. |
-| TV recusa na hora (`ms.channel.unauthorized`), sem popup, mesmo com a lista de dispositivos vazia | Estado travado do serviço de conexão. Na TV: **Configurações → Suporte → Autodiagnóstico → Redefinir Smart Hub** (PIN 0000) e tente de novo. Em último caso, atualize o software da TV. |
+| TV recusa na hora (`ms.channel.unauthorized`), sem popup, mesmo com a lista de dispositivos vazia | Estado travado do serviço de conexão. Na TV: desative **Modo Inicial Rápido/Instant On**, **tire da tomada por 1 minuto** (standby não reinicia o serviço de rede) e tente de novo. Se persistir: **Configurações → Suporte → Autodiagnóstico → Redefinir Smart Hub** (PIN 0000) + aceitar novamente os termos, e em último caso **Atualizar software**. |
 | Firewall | Libere as portas **8000/8001/8002** da TV e UDP **1900** (SSDP) no Windows. |
 | Texto não é digitado | O campo de texto precisa estar aberto/focado na TV; alguns apps bloqueiam entrada externa. |
 | Teclas coloridas/PRÉ/+100 sem efeito | Isso varia entre modelos — é a TV que decide interpretar cada código. |
