@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Controle Remoto Samsung</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-badge">TV</span>
+          <div>
+            <h1>Controle Remoto Samsung</h1>
+            <p class="brand-sub" id="connected-name">Nenhuma TV conectada</p>
+          </div>
+        </div>
+        <div class="status-pill" id="status-pill" data-state="idle">
+          <span class="dot"></span>
+          <span id="status-text">Desconectado</span>
+        </div>
+      </header>
+
+      <main class="layout">
+        <aside class="col-left">
+          <section class="card">
+            <div class="card-head">
+              <h2>TVs na rede</h2>
+              <button class="btn primary" id="discover-btn">Buscar TVs</button>
+            </div>
+
+            <form class="inline-form" id="ip-form">
+              <input
+                type="text"
+                id="ip-input"
+                placeholder="Adicionar por IP — ex.: 192.168.0.10"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="btn" type="submit">Adicionar</button>
+            </form>
+
+            <ul class="device-list" id="device-list"></ul>
+            <p class="empty" id="device-empty">
+              Nenhuma TV encontrada ainda. Clique em “Buscar TVs” ou adicione pelo IP.
+            </p>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2>Apps da TV</h2>
+              <button class="btn" id="apps-refresh" disabled>Carregar</button>
+            </div>
+            <div class="app-grid" id="app-grid"></div>
+            <p class="empty" id="apps-empty">Conecte-se a uma TV para carregar os aplicativos.</p>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2>Enviar texto</h2>
+            </div>
+            <form class="inline-form" id="text-form">
+              <input
+                type="text"
+                id="text-input"
+                placeholder="Digite aqui…"
+                autocomplete="off"
+                disabled
+              />
+              <button class="btn" type="submit" id="text-send" disabled>Enviar</button>
+            </form>
+            <p class="hint">
+              Digita no campo que estiver em foco na TV (ex.: busca do YouTube ou Netflix).
+            </p>
+          </section>
+        </aside>
+
+        <section class="col-right">
+          <div class="card remote-card">
+            <div class="remote-top">
+              <div>
+                <h2 id="remote-title">Controle</h2>
+                <p class="hint" id="remote-hint">Conecte-se a uma TV para usar o controle.</p>
+              </div>
+              <button class="btn" id="disconnect-btn" disabled>Desconectar</button>
+            </div>
+
+            <div class="remote-body disabled" id="remote-body">
+              <div class="row row-top">
+                <button class="key round power" data-key="KEY_POWER" title="Ligar/desligar">⏻</button>
+                <button class="key round" data-key="KEY_SOURCE" title="Fonte (HDMI)">
+                  <span class="glyph">⧉</span><span class="mini">Fonte</span>
+                </button>
+                <button class="key round" data-key="KEY_HOME" title="Início">
+                  <span class="glyph">⌂</span>
+                </button>
+                <button class="key round" data-key="KEY_MUTE" title="Mudo">
+                  <span class="glyph">🔇</span>
+                </button>
+              </div>
+
+              <div class="row row-main">
+                <div class="rocker">
+                  <button class="key" data-key="KEY_CHUP" title="Canal +">＋</button>
+                  <span class="rocker-label">CANAL</span>
+                  <button class="key" data-key="KEY_CHDOWN" title="Canal −">－</button>
+                </div>
+
+                <div class="dpad">
+                  <button class="key dpad-key up" data-key="KEY_UP" title="Cima">▲</button>
+                  <button class="key dpad-key left" data-key="KEY_LEFT" title="Esquerda">◀</button>
+                  <button class="key dpad-ok" data-key="KEY_ENTER" title="OK">OK</button>
+                  <button class="key dpad-key right" data-key="KEY_RIGHT" title="Direita">▶</button>
+                  <button class="key dpad-key down" data-key="KEY_DOWN" title="Baixo">▼</button>
+                </div>
+
+                <div class="rocker">
+                  <button class="key" data-key="KEY_VOLUP" title="Volume +">＋</button>
+                  <span class="rocker-label">VOL</span>
+                  <button class="key" data-key="KEY_VOLDOWN" title="Volume −">－</button>
+                </div>
+              </div>
+
+              <div class="row row-pills">
+                <button class="key pill" data-key="KEY_RETURN">
+                  <span class="glyph">↩</span><span class="mini">Voltar</span>
+                </button>
+                <button class="key pill" data-key="KEY_GUIDE">
+                  <span class="glyph">▤</span><span class="mini">Guia</span>
+                </button>
+                <button class="key pill" data-key="KEY_INFO">
+                  <span class="glyph">ⓘ</span><span class="mini">Info</span>
+                </button>
+                <button class="key pill" data-key="KEY_MENU">
+                  <span class="glyph">☰</span><span class="mini">Menu</span>
+                </button>
+                <button class="key pill" data-key="KEY_EXIT">
+                  <span class="glyph">⏏</span><span class="mini">Sair</span>
+                </button>
+              </div>
+
+              <div class="row row-pills">
+                <button class="key pill" data-key="KEY_REWIND" title="Retroceder">
+                  <span class="glyph">⏪</span>
+                </button>
+                <button class="key pill" data-key="KEY_PLAY_BACK" title="Reproduzir/Pausar">
+                  <span class="glyph">⏯</span>
+                </button>
+                <button class="key pill" data-key="KEY_FF" title="Avançar">
+                  <span class="glyph">⏩</span>
+                </button>
+                <button class="key pill" data-key="KEY_TOOLS">
+                  <span class="glyph">⚙</span><span class="mini">Ferramentas</span>
+                </button>
+                <button class="key pill" data-key="KEY_CH_LIST">
+                  <span class="glyph">☷</span><span class="mini">Canais</span>
+                </button>
+              </div>
+
+              <div class="row row-bottom">
+                <button class="key dot red" data-key="KEY_RED" title="Vermelho"></button>
+                <button class="key dot green" data-key="KEY_GREEN" title="Verde"></button>
+                <button class="key dot yellow" data-key="KEY_YELLOW" title="Amarelo"></button>
+                <button class="key dot blue" data-key="KEY_BLUE" title="Azul"></button>
+                <button class="key pill small" id="numpad-toggle" title="Teclado numérico">123</button>
+              </div>
+
+              <div class="numpad hidden" id="numpad">
+                <button class="key num" data-key="KEY_1">1</button>
+                <button class="key num" data-key="KEY_2">2</button>
+                <button class="key num" data-key="KEY_3">3</button>
+                <button class="key num" data-key="KEY_4">4</button>
+                <button class="key num" data-key="KEY_5">5</button>
+                <button class="key num" data-key="KEY_6">6</button>
+                <button class="key num" data-key="KEY_7">7</button>
+                <button class="key num" data-key="KEY_8">8</button>
+                <button class="key num" data-key="KEY_9">9</button>
+                <button class="key num" data-key="KEY_PRECH">PRÉ</button>
+                <button class="key num" data-key="KEY_0">0</button>
+                <button class="key num" data-key="KEY_PLUS100">+100</button>
+              </div>
+            </div>
+
+            <p class="hint shortcuts">
+              Atalhos do teclado: setas = navegar • Enter = OK • Backspace = voltar • +/− volume •
+              M = mudo • Espaço = play/pause
+            </p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-stack" id="toast-stack"></div>
+  </body>
+</html>
