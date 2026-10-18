@@ -48,6 +48,24 @@ npm run tauri build
 
 Os artefatos ficam em `src-tauri/target/release/bundle` (`.msi`/`.exe` no Windows).
 
+## Android (APK)
+
+O app também compila para **Android** (Tauri 2 mobile). Pré-requisitos:
+
+- **JDK 17+** (`JAVA_HOME`)
+- **Android SDK**: platform-tools, `platforms;android-34`, `build-tools;34.0.0` (`ANDROID_HOME`)
+- **NDK** r26+ (ex.: `ndk;28.2.13676358`) com `NDK_HOME` apontando para a pasta do NDK
+- Alvos Rust: `rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android`
+
+```bash
+npm run tauri android init                      # gera src-tauri/gen/android (já versionado)
+npm run tauri android build -- --apk --target aarch64
+```
+
+O APK sai em `src-tauri/gen/android/app/build/outputs/apk/arm64/release/`. Transfira para o
+celular e instale (permitindo “fontes desconhecidas”). No aparelho, repita o processo do token
+do SmartThings — a configuração é por dispositivo.
+
 ## Como funciona
 
 O app usa a **API pública do SmartThings** (`https://api.smartthings.com/v1`) com seu token pessoal:
