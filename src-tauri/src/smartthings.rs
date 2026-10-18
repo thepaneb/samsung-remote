@@ -299,11 +299,20 @@ pub async fn get_status_raw(
     }
 
     let value: Value = response.json().await.unwrap_or(Value::Null);
+
+    // A resposta traz os atributos no nível raiz ("{atributo}": {"value": ...});
+    // por garantia, também aceitamos o formato aninhado por capacidade.
     Ok(value
-        .get(capability)
-        .and_then(|c| c.get(attribute))
+        .get(attribute)
         .and_then(|a| a.get("value"))
-        .cloned())
+        .cloned()
+        .or_else(|| {
+            value
+                .get(capability)
+                .and_then(|c| c.get(attribute))
+                .and_then(|a| a.get("value"))
+                .cloned()
+        }))
 }
 
 pub async fn get_status(
@@ -367,12 +376,17 @@ pub async fn send_command(
 
 pub async fn list_inputs(app: &AppHandle) -> Result<Vec<StInput>, String> {
     let cfg = load(app);
-    let (token, device_id) = require_token_device(&cfg)?;
+    list_inputs_core(&cfg).await
+}
+
+/// Mesma lógica de `list_inputs`, sem depender do AppHandle (testável).
+pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
+    let (token, device_id) = require_token_device(cfg)?;
 
     // Variante Samsung: traz a lista real de entradas (com o nome configurado
     // em cada HDMI).
-    if has_cap(&cfg, "samsungvd.mediaInputSource") {
-        let component = component_for(&cfg, "samsungvd.mediaInputSource");
+    if has_cap(cfg, "samsungvd.mediaInputSource") {
+        let component = component_for(cfg, "samsungvd.mediaInputSource");
         let raw = get_status_raw(
             &token,
             &device_id,
@@ -391,7 +405,8 @@ pub async fn list_inputs(app: &AppHandle) -> Result<Vec<StInput>, String> {
         .await?;
 
         let inputs: Vec<StInput> = raw
-            .and_then(|v| serde_json::from_value::<Vec<Value>>(v).ok())
+            .as_ref()
+            .and_then(|v| serde_json::from_value::<Vec<Value>>(v.clone()).ok())
             .map(|items| {
                 items
                     .iter()
@@ -412,11 +427,21 @@ pub async fn list_inputs(app: &AppHandle) -> Result<Vec<StInput>, String> {
         if !inputs.is_empty() {
             return Ok(inputs);
         }
+
+        // Diagnóstico detalhado quando a leitura não devolveu o esperado.
+        return Err(format!(
+            "A TV não informou as entradas disponíveis. (componente: {component}; \
+             supportedInputSourcesMap: {}; inputSource: {})",
+            raw.as_ref()
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "sem resposta".to_string()),
+            current.unwrap_or_else(|| "sem resposta".to_string()),
+        ));
     }
 
     // Fallback: capacidade padrão.
-    if has_cap(&cfg, "mediaInputSource") {
-        let component = component_for(&cfg, "mediaInputSource");
+    if has_cap(cfg, "mediaInputSource") {
+        let component = component_for(cfg, "mediaInputSource");
         let supported = get_status(
             &token,
             &device_id,
@@ -452,9 +477,16 @@ pub async fn list_inputs(app: &AppHandle) -> Result<Vec<StInput>, String> {
         if !inputs.is_empty() {
             return Ok(inputs);
         }
+
+        return Err(format!(
+            "A TV não informou as entradas disponíveis. (componente: {component}; \
+             supportedInputSources: {}; inputSource: {})",
+            supported.unwrap_or_else(|| "sem resposta".to_string()),
+            current.unwrap_or_else(|| "sem resposta".to_string()),
+        ));
     }
 
-    Err("A TV não informou as entradas disponíveis.".into())
+    Err("A TV não expõe troca de entrada no modo nuvem.".into())
 }
 
 // ---------------------------------------------------------------------------

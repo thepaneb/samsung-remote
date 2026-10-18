@@ -1,5 +1,5 @@
 mod commands;
-mod smartthings;
+pub mod smartthings;
 
 use tauri::Manager;
 
