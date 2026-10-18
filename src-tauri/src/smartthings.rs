@@ -31,6 +31,18 @@ pub struct StConfig {
     /// capacidade → componente que a expõe (ex.: "switch" → "main")
     #[serde(default)]
     pub cap_components: std::collections::HashMap<String, String>,
+    /// último estado de energia conhecido (a nuvem não atualiza sempre)
+    #[serde(default)]
+    pub power_on: Option<bool>,
+    /// timestamp da última leitura de energia feita da nuvem
+    #[serde(default)]
+    pub power_stamp: Option<String>,
+    /// última entrada escolhida pelo app (a nuvem pode ficar desatualizada)
+    #[serde(default)]
+    pub current_input: Option<String>,
+    /// timestamp da última leitura de entrada feita da nuvem
+    #[serde(default)]
+    pub input_stamp: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -278,13 +290,17 @@ pub async fn fetch_device(
     Ok((label, all_caps, detailed))
 }
 
-pub async fn get_status_raw(
+/// Lê um atributo junto com o timestamp informado pela nuvem (o timestamp
+/// permite detectar quando a informação realmente mudou — alguns atributos
+/// ficam "congelados" na nuvem em certos modelos).
+#[allow(clippy::type_complexity)]
+async fn get_status_tracked(
     token: &str,
     device_id: &str,
     component: &str,
     capability: &str,
     attribute: &str,
-) -> Result<Option<Value>, String> {
+) -> Result<(Option<Value>, Option<String>), String> {
     let response = client()?
         .get(format!(
             "{API}/devices/{device_id}/components/{component}/capabilities/{capability}/status"
@@ -295,24 +311,36 @@ pub async fn get_status_raw(
         .map_err(|e| format!("Falha ao ler o estado: {e}"))?;
 
     if !response.status().is_success() {
-        return Ok(None);
+        return Ok((None, None));
     }
 
     let value: Value = response.json().await.unwrap_or(Value::Null);
 
     // A resposta traz os atributos no nível raiz ("{atributo}": {"value": ...});
     // por garantia, também aceitamos o formato aninhado por capacidade.
-    Ok(value
+    let entry = value
         .get(attribute)
-        .and_then(|a| a.get("value"))
-        .cloned()
-        .or_else(|| {
-            value
-                .get(capability)
-                .and_then(|c| c.get(attribute))
-                .and_then(|a| a.get("value"))
-                .cloned()
-        }))
+        .or_else(|| value.get(capability).and_then(|c| c.get(attribute)));
+
+    match entry {
+        Some(item) => Ok((
+            item.get("value").cloned(),
+            item.get("timestamp").and_then(|t| t.as_str()).map(str::to_string),
+        )),
+        None => Ok((None, None)),
+    }
+}
+
+pub async fn get_status_raw(
+    token: &str,
+    device_id: &str,
+    component: &str,
+    capability: &str,
+    attribute: &str,
+) -> Result<Option<Value>, String> {
+    Ok(get_status_tracked(token, device_id, component, capability, attribute)
+        .await?
+        .0)
 }
 
 pub async fn get_status(
@@ -376,18 +404,34 @@ pub async fn send_command(
 
 pub async fn list_inputs(app: &AppHandle) -> Result<Vec<StInput>, String> {
     let cfg = load(app);
-    list_inputs_core(&cfg).await
+    let (inputs, stamp) = inputs_core(&cfg).await?;
+
+    // Sincroniza a memória da entrada atual quando a nuvem trouxe novidade.
+    if stamp.is_some() && stamp != cfg.input_stamp {
+        let mut updated = cfg;
+        updated.input_stamp = stamp;
+        updated.current_input = inputs.iter().find(|i| i.current).map(|i| i.id.clone());
+        save(app, &updated);
+    }
+
+    Ok(inputs)
 }
 
 /// Mesma lógica de `list_inputs`, sem depender do AppHandle (testável).
 pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
+    Ok(inputs_core(cfg).await?.0)
+}
+
+/// Lê a lista de entradas e marca a atual; devolve também o timestamp da
+/// leitura (para o chamador sincronizar a memória local).
+async fn inputs_core(cfg: &StConfig) -> Result<(Vec<StInput>, Option<String>), String> {
     let (token, device_id) = require_token_device(cfg)?;
 
     // Variante Samsung: traz a lista real de entradas (com o nome configurado
     // em cada HDMI).
     if has_cap(cfg, "samsungvd.mediaInputSource") {
         let component = component_for(cfg, "samsungvd.mediaInputSource");
-        let raw = get_status_raw(
+        let (raw, stamp) = get_status_tracked(
             &token,
             &device_id,
             &component,
@@ -395,7 +439,7 @@ pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
             "supportedInputSourcesMap",
         )
         .await?;
-        let current = get_status(
+        let (cloud_current, _) = get_status_tracked(
             &token,
             &device_id,
             &component,
@@ -403,6 +447,16 @@ pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
             "inputSource",
         )
         .await?;
+        let cloud_current = cloud_current.and_then(|v| v.as_str().map(str::to_string));
+
+        // A nuvem pode ficar com o valor congelado: se o timestamp não mudou,
+        // confiamos na última entrada escolhida pelo próprio app.
+        let stamp_changed = stamp.is_some() && stamp != cfg.input_stamp;
+        let effective = if stamp_changed {
+            cloud_current.clone()
+        } else {
+            cfg.current_input.clone().or(cloud_current.clone())
+        };
 
         let inputs: Vec<StInput> = raw
             .as_ref()
@@ -417,7 +471,7 @@ pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
                             .and_then(|v| v.as_str())
                             .unwrap_or(id.as_str())
                             .to_string();
-                        let current = current.as_deref() == Some(id.as_str());
+                        let current = effective.as_deref() == Some(id.as_str());
                         Some(StInput { id, name, current })
                     })
                     .collect()
@@ -425,7 +479,7 @@ pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
             .unwrap_or_default();
 
         if !inputs.is_empty() {
-            return Ok(inputs);
+            return Ok((inputs, stamp));
         }
 
         // Diagnóstico detalhado quando a leitura não devolveu o esperado.
@@ -435,7 +489,7 @@ pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
             raw.as_ref()
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "sem resposta".to_string()),
-            current.unwrap_or_else(|| "sem resposta".to_string()),
+            cloud_current.unwrap_or_else(|| "sem resposta".to_string()),
         ));
     }
 
@@ -450,7 +504,7 @@ pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
             "supportedInputSources",
         )
         .await?;
-        let current = get_status(
+        let cloud_current = get_status(
             &token,
             &device_id,
             &component,
@@ -458,6 +512,7 @@ pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
             "inputSource",
         )
         .await?;
+        let effective = cfg.current_input.clone().or(cloud_current.clone());
 
         let inputs: Vec<StInput> = supported
             .as_deref()
@@ -468,21 +523,21 @@ pub async fn list_inputs_core(cfg: &StConfig) -> Result<Vec<StInput>, String> {
                     .map(|id| StInput {
                         id: id.to_string(),
                         name: id.to_string(),
-                        current: current.as_deref() == Some(id),
+                        current: effective.as_deref() == Some(id),
                     })
                     .collect()
             })
             .unwrap_or_default();
 
         if !inputs.is_empty() {
-            return Ok(inputs);
+            return Ok((inputs, None));
         }
 
         return Err(format!(
             "A TV não informou as entradas disponíveis. (componente: {component}; \
              supportedInputSources: {}; inputSource: {})",
             supported.unwrap_or_else(|| "sem resposta".to_string()),
-            current.unwrap_or_else(|| "sem resposta".to_string()),
+            cloud_current.unwrap_or_else(|| "sem resposta".to_string()),
         ));
     }
 
@@ -517,6 +572,11 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
     let cfg = load(app);
     let (token, device_id) = require_token_device(&cfg)?;
 
+    // Estado a persistir após o envio bem-sucedido (a nuvem nem sempre
+    // atualiza o estado real da TV, então o app mantém memória própria).
+    let mut new_power: Option<(bool, Option<String>)> = None;
+    let mut new_input: Option<String> = None;
+
     let (capability, command, arguments): (&str, String, Vec<Value>) = match action {
         "power_on" | "power_off" => {
             if !has_cap(&cfg, "switch") {
@@ -531,8 +591,25 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
                 return Err("A TV não expõe controle de energia no SmartThings.".into());
             }
             let component = component_for(&cfg, "switch");
-            let state = get_status(&token, &device_id, &component, "switch", "switch").await?;
-            let cmd = if state.as_deref() == Some("on") { "off" } else { "on" };
+            let (value, stamp) =
+                get_status_tracked(&token, &device_id, &component, "switch", "switch").await?;
+            let cloud_on = value
+                .as_ref()
+                .and_then(|v| v.as_str())
+                .map(|s| s == "on");
+
+            // Se o timestamp da nuvem mudou, a informação é nova; senão,
+            // mantemos o último estado conhecido (a nuvem fica congelada).
+            let stamp_changed = stamp.is_some() && stamp != cfg.power_stamp;
+            let known = if stamp_changed {
+                cloud_on
+            } else {
+                cfg.power_on.or(cloud_on)
+            };
+
+            let target_on = !known.unwrap_or(true);
+            new_power = Some((target_on, stamp));
+            let cmd = if target_on { "on" } else { "off" };
             ("switch", cmd.to_string(), vec![])
         }
 
@@ -615,6 +692,7 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
             } else {
                 return Err("Troca de entrada não disponível no modo nuvem para esta TV.".into());
             };
+            new_input = Some(id.clone());
             (capability, "setInputSource".to_string(), vec![Value::String(id)])
         }
 
@@ -646,7 +724,7 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
     };
 
     let component = component_for(&cfg, capability);
-    send_command(
+    let result = send_command(
         &token,
         &device_id,
         &component,
@@ -654,5 +732,23 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
         &command,
         arguments,
     )
-    .await
+    .await;
+
+    result?;
+
+    if new_power.is_some() || new_input.is_some() {
+        let mut updated = cfg;
+        if let Some((target_on, stamp)) = new_power {
+            updated.power_on = Some(target_on);
+            if stamp.is_some() {
+                updated.power_stamp = stamp;
+            }
+        }
+        if let Some(id) = new_input {
+            updated.current_input = Some(id);
+        }
+        save(app, &updated);
+    }
+
+    Ok(())
 }
