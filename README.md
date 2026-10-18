@@ -65,10 +65,11 @@ modo alternativo de controle pela **nuvem do SmartThings**:
 3. No app (Tauri), cole o token no cartão **“Modo nuvem (SmartThings)”** e clique em **Salvar**.
 4. Escolha sua TV na lista e clique em **“Usar esta TV”**.
 
-Teclas disponíveis no modo nuvem (dependem das capacidades que a TV expõe): **power**,
-**volume**, **mudo**, **canal**, **play/pause**, **rewind**, **avançar**, **trocar de entrada**
-(ciclo) e **abrir apps** (com IDs predefinidos ou um ID digitado). Teclas de navegação (D-pad),
-menu, números e texto existem apenas no modo local.
+Teclas disponíveis no modo nuvem (dependem das capacidades que a TV expõe no SmartThings):
+**power, volume, mudo, canal, play/pause, rewind, avançar, trocar de entrada** (direto para a
+entrada escolhida, com os nomes configurados nos HDMI), **abrir apps** e, quando a TV expõe a
+capacidade `samsungvd.remoteControl`: **D-pad completo, OK, Voltar, Menu, Home e Sair**.
+Números, teclas coloridas, Guia/Info/Ferramentas e envio de texto existem apenas no modo local.
 
 > Os **IDs de apps** variam por região/ano da TV. Se algum atalho abrir o app errado, use o campo
 > de **ID personalizado** com o código correto para o seu modelo (veja a lista da comunidade em
