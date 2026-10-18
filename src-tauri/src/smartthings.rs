@@ -30,6 +30,12 @@ pub struct StConfig {
     /// capacidade → componente que a expõe (ex.: "switch" → "main")
     #[serde(default)]
     pub cap_components: std::collections::HashMap<String, String>,
+    /// estado local do mudo (a leitura pela nuvem é inconsistente em TVs 2019)
+    #[serde(default)]
+    pub muted: Option<bool>,
+    /// estado local de reprodução
+    #[serde(default)]
+    pub playing: Option<bool>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -329,6 +335,11 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
             .unwrap_or_else(|| "main".to_string())
     };
 
+    // Estado previsto após o comando (a leitura de status pela nuvem é
+    // inconsistente em TVs 2019; mantemos o estado local como reforço).
+    let mut new_muted: Option<bool> = None;
+    let mut new_playing: Option<bool> = None;
+
     // Resolve a capacidade, o comando e os argumentos de cada ação.
     let (capability, command, arguments): (&str, String, Vec<Value>) = match action {
         "power_on" | "power_off" => {
@@ -358,9 +369,17 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
         }
 
         "mute_toggle" => {
+            if !has("audioMute") && !has("audioVolume") {
+                return Err("Mudo não disponível no modo nuvem para esta TV.".into());
+            }
             let component = component_for("audioMute");
             let state = get_status(&token, &device_id, &component, "audioMute", "mute").await?;
-            let muted = state.as_deref().map(|s| s.starts_with("mut")).unwrap_or(false);
+            let muted = match state.as_deref() {
+                Some("muted") | Some("mute") | Some("on") | Some("true") => true,
+                Some("unmuted") | Some("unmute") | Some("off") | Some("false") => false,
+                _ => cfg.muted.unwrap_or(false),
+            };
+            new_muted = Some(!muted);
             let cmd = if muted { "unmute" } else { "mute" };
             ("audioMute", cmd.to_string(), vec![])
         }
@@ -381,10 +400,13 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
             let state =
                 get_status(&token, &device_id, &component, "mediaPlayback", "playbackStatus")
                     .await?;
-            let playing = state
-                .as_deref()
-                .map(|s| s.starts_with("play") || s.starts_with("fast"))
-                .unwrap_or(false);
+            let playing = match state.as_deref() {
+                Some("play") | Some("playing") | Some("fast forward") | Some("fast forwarding") => true,
+                Some("pause") | Some("paused") | Some("stop") | Some("stopped")
+                | Some("rewind") | Some("rewinding") => false,
+                _ => cfg.playing.unwrap_or(false),
+            };
+            new_playing = Some(!playing);
             let cmd = if playing { "pause" } else { "play" };
             ("mediaPlayback", cmd.to_string(), vec![])
         }
@@ -453,8 +475,10 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
         other => return Err(format!("Ação \"{other}\" não suportada no modo nuvem.")),
     };
 
+    // Envia o comando; se a TV recusar, tenta variações equivalentes
+    // (ex.: setMute em vez de mute, setPlaybackStatus em vez de pause).
     let component = component_for(capability);
-    send_command(
+    let mut result = send_command(
         &token,
         &device_id,
         &component,
@@ -462,5 +486,53 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
         &command,
         arguments,
     )
-    .await
+    .await;
+
+    if result.is_err() && capability == "audioMute" {
+        let want_muted = command == "mute";
+        result = send_command(
+            &token,
+            &device_id,
+            &component,
+            "audioMute",
+            "setMute",
+            vec![Value::Bool(want_muted)],
+        )
+        .await;
+
+        if result.is_err() {
+            result = send_command(&token, &device_id, &component, "audioVolume", &command, vec![])
+                .await;
+        }
+    }
+
+    if result.is_err()
+        && capability == "mediaPlayback"
+        && (command == "play" || command == "pause")
+    {
+        result = send_command(
+            &token,
+            &device_id,
+            &component,
+            "mediaPlayback",
+            "setPlaybackStatus",
+            vec![Value::String(command.clone())],
+        )
+        .await;
+    }
+
+    result?;
+
+    if new_muted.is_some() || new_playing.is_some() {
+        let mut updated = cfg;
+        if let Some(m) = new_muted {
+            updated.muted = Some(m);
+        }
+        if let Some(p) = new_playing {
+            updated.playing = Some(p);
+        }
+        save(app, &updated);
+    }
+
+    Ok(())
 }

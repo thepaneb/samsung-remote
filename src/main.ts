@@ -106,11 +106,16 @@ const CLOUD_KEY_CAPABILITY: Record<string, string> = {
 };
 
 // Atalhos comuns (usados no modo nuvem, onde não é possível listar os apps da TV)
+// IDs conforme a lista da comunidade (apps Samsung/Tizen); alguns variam por região/ano.
 const APP_PRESETS: TvApp[] = [
-  { appId: "3201512006785", name: "Netflix" },
+  { appId: "11101200001", name: "Netflix" },
   { appId: "111299001912", name: "YouTube" },
-  { appId: "3201910019365", name: "Prime Video" },
+  { appId: "3201512006785", name: "Prime Video" },
+  { appId: "3201901017640", name: "Disney+" },
+  { appId: "3201908019022", name: "Globoplay" },
+  { appId: "3201601007230", name: "HBO Max" },
   { appId: "3201606009684", name: "Spotify" },
+  { appId: "org.tizen.browser", name: "Internet" },
 ];
 
 const devices = new Map<string, TvDevice>();
