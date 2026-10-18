@@ -743,6 +743,66 @@ code {
   font-size: 0.72rem;
 }
 
+/* ------------------------------------------------------- telas estreitas */
+
+@media (max-width: 560px) {
+  :root {
+    font-size: 14px;
+  }
+
+  .app {
+    padding: 12px 12px 20px;
+    gap: 12px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .card {
+    padding: 13px;
+  }
+
+  .row-main {
+    padding: 4px;
+    gap: 8px;
+  }
+
+  .key.round {
+    width: 54px;
+    height: 54px;
+  }
+
+  .rocker {
+    width: 62px;
+  }
+
+  .rocker .key {
+    height: 54px;
+  }
+
+  .dpad {
+    width: 186px;
+    height: 186px;
+  }
+
+  .dpad-ok {
+    width: 64px;
+    height: 64px;
+  }
+
+  .row-pills .key.pill {
+    width: 74px;
+    height: 52px;
+  }
+
+  .app-grid {
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  }
+}
+
 /* ------------------------------------------------------ seletor de entrada */
 
 .input-overlay {
