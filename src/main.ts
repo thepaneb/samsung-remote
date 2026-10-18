@@ -79,30 +79,49 @@ const appCustomForm = $<HTMLFormElement>("#app-custom-form");
 const appCustomId = $<HTMLInputElement>("#app-custom-id");
 
 // Teclas que o modo nuvem consegue enviar (mapeadas para capacidades SmartThings)
-const CLOUD_KEY_ACTIONS: Record<string, string> = {
-  KEY_POWER: "power_toggle",
-  KEY_VOLUP: "volume_up",
-  KEY_VOLDOWN: "volume_down",
-  KEY_MUTE: "mute_toggle",
-  KEY_CHUP: "channel_up",
-  KEY_CHDOWN: "channel_down",
-  KEY_PLAY_BACK: "play_pause",
-  KEY_REWIND: "rewind",
-  KEY_FF: "fast_forward",
-  KEY_SOURCE: "cycle_input",
+const CLOUD_KEY_ACTIONS: Record<string, { action: string; arg?: string }> = {
+  KEY_POWER: { action: "power_toggle" },
+  KEY_VOLUP: { action: "volume_up" },
+  KEY_VOLDOWN: { action: "volume_down" },
+  KEY_MUTE: { action: "mute_toggle" },
+  KEY_CHUP: { action: "channel_up" },
+  KEY_CHDOWN: { action: "channel_down" },
+  KEY_PLAY_BACK: { action: "play_pause" },
+  KEY_REWIND: { action: "rewind" },
+  KEY_FF: { action: "fast_forward" },
+  KEY_SOURCE: { action: "cycle_input" },
+  KEY_UP: { action: "remote_key", arg: "UP" },
+  KEY_DOWN: { action: "remote_key", arg: "DOWN" },
+  KEY_LEFT: { action: "remote_key", arg: "LEFT" },
+  KEY_RIGHT: { action: "remote_key", arg: "RIGHT" },
+  KEY_ENTER: { action: "remote_key", arg: "OK" },
+  KEY_RETURN: { action: "remote_key", arg: "BACK" },
+  KEY_EXIT: { action: "remote_key", arg: "EXIT" },
+  KEY_MENU: { action: "remote_key", arg: "MENU" },
+  KEY_HOME: { action: "remote_key", arg: "HOME" },
 };
 
-const CLOUD_KEY_CAPABILITY: Record<string, string> = {
-  KEY_POWER: "switch",
-  KEY_VOLUP: "audioVolume",
-  KEY_VOLDOWN: "audioVolume",
-  KEY_MUTE: "audioMute",
-  KEY_CHUP: "tvChannel",
-  KEY_CHDOWN: "tvChannel",
-  KEY_PLAY_BACK: "mediaPlayback",
-  KEY_REWIND: "mediaPlayback",
-  KEY_FF: "mediaPlayback",
-  KEY_SOURCE: "mediaInputSource",
+// Capacidade(s) que habilitam cada tecla no modo nuvem (basta uma existir)
+const CLOUD_KEY_CAPABILITY: Record<string, string[]> = {
+  KEY_POWER: ["switch"],
+  KEY_VOLUP: ["audioVolume"],
+  KEY_VOLDOWN: ["audioVolume"],
+  KEY_MUTE: ["samsungvd.remoteControl", "audioMute"],
+  KEY_CHUP: ["tvChannel"],
+  KEY_CHDOWN: ["tvChannel"],
+  KEY_PLAY_BACK: ["samsungvd.remoteControl", "mediaPlayback"],
+  KEY_REWIND: ["mediaPlayback", "samsungvd.remoteControl"],
+  KEY_FF: ["mediaPlayback", "samsungvd.remoteControl"],
+  KEY_SOURCE: ["samsungvd.mediaInputSource", "mediaInputSource"],
+  KEY_UP: ["samsungvd.remoteControl"],
+  KEY_DOWN: ["samsungvd.remoteControl"],
+  KEY_LEFT: ["samsungvd.remoteControl"],
+  KEY_RIGHT: ["samsungvd.remoteControl"],
+  KEY_ENTER: ["samsungvd.remoteControl"],
+  KEY_RETURN: ["samsungvd.remoteControl"],
+  KEY_EXIT: ["samsungvd.remoteControl"],
+  KEY_MENU: ["samsungvd.remoteControl"],
+  KEY_HOME: ["samsungvd.remoteControl"],
 };
 
 // Atalhos comuns (usados no modo nuvem, onde não é possível listar os apps da TV)
@@ -168,8 +187,8 @@ function refreshRemoteAvailability() {
 
   remoteBody.querySelectorAll<HTMLButtonElement>("button.key[data-key]").forEach((button) => {
     const key = button.dataset.key ?? "";
-    const capability = CLOUD_KEY_CAPABILITY[key];
-    const cloudOk = cloudActive && capability !== undefined && cloudCaps.includes(capability);
+    const caps = CLOUD_KEY_CAPABILITY[key];
+    const cloudOk = cloudActive && caps !== undefined && caps.some((c) => cloudCaps.includes(c));
     button.classList.toggle("cloud-off", !local && !cloudOk);
   });
 }
@@ -470,12 +489,12 @@ remoteBody.addEventListener("click", (event) => {
   }
 
   if (cloudActive) {
-    const action = CLOUD_KEY_ACTIONS[key];
-    if (!action) {
+    const entry = CLOUD_KEY_ACTIONS[key];
+    if (!entry) {
       toast("Tecla indisponível no modo nuvem (SmartThings).", "info");
       return;
     }
-    void stExecute(action);
+    void stExecute(entry.action, entry.arg);
   }
 });
 
@@ -631,9 +650,9 @@ window.addEventListener("keydown", (event) => {
     void sendKey(key);
     return;
   }
-  const cloudAction = CLOUD_KEY_ACTIONS[key];
-  if (cloudAction) {
-    void stExecute(cloudAction);
+  const cloudEntry = CLOUD_KEY_ACTIONS[key];
+  if (cloudEntry) {
+    void stExecute(cloudEntry.action, cloudEntry.arg);
   } else {
     toast("Tecla indisponível no modo nuvem (SmartThings).", "info");
   }
