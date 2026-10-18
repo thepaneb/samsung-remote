@@ -751,6 +751,20 @@ code {
   font-size: 0.72rem;
 }
 
+.glyph-svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+#app-custom-form {
+  margin-top: 12px;
+}
+
 /* ------------------------------------------------------- telas estreitas */
 
 @media (max-width: 560px) {
@@ -759,10 +773,7 @@ code {
   }
 
   .app {
-    padding-top: calc(12px + env(safe-area-inset-top, 0px));
-    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-    padding-left: calc(12px + env(safe-area-inset-left, 0px));
-    padding-right: calc(12px + env(safe-area-inset-right, 0px));
+    padding: 12px 12px 20px;
     gap: 12px;
   }
 

@@ -67,12 +67,17 @@
 
           <div class="remote-body disabled" id="remote-body">
             <div class="row row-top">
-              <button class="key round power" data-key="KEY_POWER" title="Ligar/desligar">⏻</button>
+              <button class="key round power" data-key="KEY_POWER" title="Ligar/desligar">
+                <svg class="glyph-svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3.5v8" />
+                  <path d="M7.4 6.4a7.5 7.5 0 1 0 9.2 0" />
+                </svg>
+              </button>
               <button class="key round" data-key="KEY_SOURCE" title="Trocar entrada">
-                <span class="glyph">⧉</span><span class="mini">Fonte</span>
+                <span class="glyph">⇄</span><span class="mini">Fonte</span>
               </button>
               <button class="key round" data-key="KEY_HOME" title="Início">
-                <span class="glyph">⌂</span>
+                <span class="glyph">🏠</span>
               </button>
               <button class="key round" data-key="KEY_MUTE" title="Mudo">
                 <span class="glyph">🔇</span>
@@ -103,13 +108,13 @@
 
             <div class="row row-pills">
               <button class="key pill" data-key="KEY_RETURN">
-                <span class="glyph">↩</span><span class="mini">Voltar</span>
+                <span class="glyph">←</span><span class="mini">Voltar</span>
               </button>
               <button class="key pill" data-key="KEY_MENU">
-                <span class="glyph">☰</span><span class="mini">Menu</span>
+                <span class="glyph">≡</span><span class="mini">Menu</span>
               </button>
               <button class="key pill" data-key="KEY_EXIT">
-                <span class="glyph">⏏</span><span class="mini">Sair</span>
+                <span class="glyph">×</span><span class="mini">Sair</span>
               </button>
             </div>
 
@@ -157,7 +162,7 @@
       <div class="input-menu card">
         <div class="card-head">
           <h2>Escolher entrada</h2>
-          <button class="btn ghost" id="input-close">✕</button>
+          <button class="btn ghost" id="input-close">×</button>
         </div>
         <div class="input-list" id="input-list"></div>
       </div>
