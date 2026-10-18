@@ -66,6 +66,29 @@ O APK sai em `src-tauri/gen/android/app/build/outputs/apk/arm64/release/`. Trans
 celular e instale (permitindo “fontes desconhecidas”). No aparelho, repita o processo do token
 do SmartThings — a configuração é por dispositivo.
 
+### Assinar o APK (sideload)
+
+O build gera um APK **unsigned**; para instalar no Android é preciso assinar. Exemplo (Windows):
+
+```powershell
+# chave de assinatura (gerar uma vez; mantenha fora do Git)
+keytool -genkeypair -v -keystore src-tauri/android-key/release.jks `
+  -storepass samsungremote -keypass samsungremote -alias samsungremote `
+  -keyalg RSA -keysize 2048 -validity 10950 -dname "CN=Samsung Remote, O=Personal, C=BR"
+
+# alinhar e assinar (ferramentas em %LOCALAPPDATA%\Android\Sdk\build-tools\37.0.0)
+zipalign -f -p 4 app-...-unsigned.apk aligned.apk
+apksigner sign --ks src-tauri/android-key/release.jks `
+  --ks-pass pass:samsungremote --key-pass pass:samsungremote `
+  --out "Samsung Remote_0.1.0_aarch64.apk" aligned.apk
+```
+
+Para instalar via USB: ative a depuração USB e rode
+`adb install -r "Samsung Remote_0.1.0_aarch64.apk"` (`adb` em `platform-tools`).
+
+> Nota: o projeto usa **rustls** (TLS em Rust puro) em vez de native-tls para que a mesma base
+> de código compile para desktop e Android sem depender de OpenSSL do sistema.
+
 ## Como funciona
 
 O app usa a **API pública do SmartThings** (`https://api.smartthings.com/v1`) com seu token pessoal:
