@@ -671,6 +671,40 @@ body {
   font-weight: 800;
 }
 
+.key.pill.wide {
+  width: 118px;
+}
+
+/* -------------------------------------------------------- canal/numérico */
+
+.channel-display {
+  text-align: center;
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  min-height: 46px;
+  padding: 2px 0 10px;
+  color: var(--accent);
+}
+
+.numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.numpad-grid .input-item {
+  text-align: center;
+  padding: 14px 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.btn.full {
+  width: 100%;
+  margin-top: 12px;
+}
+
 /* cores */
 .key.dot {
   width: 34px;

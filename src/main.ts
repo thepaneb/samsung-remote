@@ -50,6 +50,16 @@ const remoteHint = $<HTMLParagraphElement>("#remote-hint");
 const inputOverlay = $<HTMLDivElement>("#input-overlay");
 const inputList = $<HTMLDivElement>("#input-list");
 const inputClose = $<HTMLButtonElement>("#input-close");
+const channelOverlay = $<HTMLDivElement>("#channel-overlay");
+const channelNow = $<HTMLParagraphElement>("#channel-now");
+const channelDisplay = $<HTMLDivElement>("#channel-display");
+const channelBack = $<HTMLButtonElement>("#channel-back");
+const channelGo = $<HTMLButtonElement>("#channel-go");
+const channelClose = $<HTMLButtonElement>("#channel-close");
+const searchOverlay = $<HTMLDivElement>("#search-overlay");
+const searchForm = $<HTMLFormElement>("#search-form");
+const searchText = $<HTMLInputElement>("#search-text");
+const searchClose = $<HTMLButtonElement>("#search-close");
 const toastStack = $<HTMLDivElement>("#toast-stack");
 
 // Teclas físicas → ação na nuvem
@@ -86,6 +96,8 @@ const CLOUD_KEY_CAPABILITY: Record<string, string[]> = {
   KEY_REWIND: ["mediaPlayback", "samsungvd.remoteControl"],
   KEY_FF: ["mediaPlayback", "samsungvd.remoteControl"],
   KEY_SOURCE: ["samsungvd.mediaInputSource", "mediaInputSource", "samsungvd.remoteControl"],
+  KEY_NUMPAD: ["tvChannel"],
+  KEY_SEARCH: ["custom.tvsearch"],
   KEY_UP: ["samsungvd.remoteControl"],
   KEY_DOWN: ["samsungvd.remoteControl"],
   KEY_LEFT: ["samsungvd.remoteControl"],
@@ -113,6 +125,7 @@ let cloudActive = false;
 let cloudCaps: string[] = [];
 let stCollapsed = false;
 let stDeviceLabel: string | null = null;
+let channelValue = "";
 
 // ---------------------------------------------------------------------------
 // Utilidades de UI
@@ -240,12 +253,51 @@ function handleKey(key: string) {
     return;
   }
 
+  if (key === "KEY_NUMPAD") {
+    void openChannelDialog();
+    return;
+  }
+
+  if (key === "KEY_SEARCH") {
+    openSearchDialog();
+    return;
+  }
+
   const entry = CLOUD_KEY_ACTIONS[key];
   if (!entry) {
     toast("Tecla indisponível neste modelo via nuvem.", "info");
     return;
   }
   void stExecute(entry.action, entry.arg);
+}
+
+function renderChannelDisplay() {
+  channelDisplay.textContent = channelValue || "–";
+}
+
+async function openChannelDialog() {
+  if (!cloudActive) return;
+  channelValue = "";
+  renderChannelDisplay();
+  channelNow.textContent = "—";
+  channelOverlay.classList.remove("hidden");
+
+  try {
+    const info = await invoke<{ current: string | null; name: string | null }>("st_channel");
+    if (info.current) {
+      channelNow.textContent = `Canal atual: ${info.current}${info.name ? ` • ${info.name}` : ""}`;
+    } else {
+      channelNow.textContent = "A TV não informou o canal atual.";
+    }
+  } catch {
+    channelNow.textContent = "Não foi possível ler o canal atual.";
+  }
+}
+
+function openSearchDialog() {
+  if (!cloudActive) return;
+  searchOverlay.classList.remove("hidden");
+  searchText.focus();
 }
 
 async function openInputPicker() {
@@ -320,6 +372,55 @@ inputList.addEventListener("click", (event) => {
   if (!id) return;
   inputOverlay.classList.add("hidden");
   void stExecute("set_input", id);
+});
+
+// Canal direto
+channelOverlay.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  if (target === channelOverlay) {
+    channelOverlay.classList.add("hidden");
+    return;
+  }
+  const digit = target.closest<HTMLButtonElement>("[data-digit]");
+  if (digit?.dataset.digit) {
+    if (channelValue.length < 6) {
+      channelValue += digit.dataset.digit;
+      renderChannelDisplay();
+    }
+  }
+});
+
+channelClose.addEventListener("click", () => channelOverlay.classList.add("hidden"));
+
+channelBack.addEventListener("click", () => {
+  channelValue = channelValue.slice(0, -1);
+  renderChannelDisplay();
+});
+
+channelGo.addEventListener("click", () => {
+  const value = channelValue.trim();
+  if (!value) {
+    toast("Digite o número do canal.", "info");
+    return;
+  }
+  channelOverlay.classList.add("hidden");
+  void stExecute("set_channel", value).then(() => toast(`Canal ${value} enviado.`, "success"));
+});
+
+// Busca na TV
+searchOverlay.addEventListener("click", (event) => {
+  if (event.target === searchOverlay) searchOverlay.classList.add("hidden");
+});
+
+searchClose.addEventListener("click", () => searchOverlay.classList.add("hidden"));
+
+searchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const text = searchText.value.trim();
+  if (!text) return;
+  searchOverlay.classList.add("hidden");
+  searchText.value = "";
+  void stExecute("tv_search", text).then(() => toast("Busca enviada para a TV.", "success"));
 });
 
 appGrid.addEventListener("click", (event) => {

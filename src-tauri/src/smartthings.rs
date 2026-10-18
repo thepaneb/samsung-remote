@@ -71,6 +71,13 @@ pub struct StInput {
     pub current: bool,
 }
 
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StChannel {
+    pub current: Option<String>,
+    pub name: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Persistência
 // ---------------------------------------------------------------------------
@@ -544,6 +551,30 @@ async fn inputs_core(cfg: &StConfig) -> Result<(Vec<StInput>, Option<String>), S
     Err("A TV não expõe troca de entrada no modo nuvem.".into())
 }
 
+/// Canal atual (pode estar desatualizado na nuvem, mas serve de referência).
+pub async fn channel_info(app: &AppHandle) -> Result<StChannel, String> {
+    let cfg = load(app);
+    let (token, device_id) = require_token_device(&cfg)?;
+
+    if !has_cap(&cfg, "tvChannel") {
+        return Ok(StChannel {
+            current: None,
+            name: None,
+        });
+    }
+
+    let component = component_for(&cfg, "tvChannel");
+    let (current, _) =
+        get_status_tracked(&token, &device_id, &component, "tvChannel", "tvChannel").await?;
+    let (name, _) =
+        get_status_tracked(&token, &device_id, &component, "tvChannel", "tvChannelName").await?;
+
+    Ok(StChannel {
+        current: current.and_then(|v| v.as_str().map(str::to_string)),
+        name: name.and_then(|v| v.as_str().map(str::to_string)),
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Execução de ações (tecla → capacidade)
 // ---------------------------------------------------------------------------
@@ -709,6 +740,37 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
             }
             let key = arg.ok_or("Tecla ausente para o comando de navegação")?;
             remote_key_attempt(key.trim().to_uppercase().as_str())?
+        }
+
+        "set_channel" => {
+            if !has_cap(&cfg, "tvChannel") {
+                return Err("Troca direta de canal não disponível nesta TV.".into());
+            }
+            let number = arg.ok_or("Número do canal ausente")?;
+            let number = number.trim().to_string();
+            if number.is_empty() {
+                return Err("Número do canal vazio".into());
+            }
+            (
+                "tvChannel",
+                "setTvChannel".to_string(),
+                vec![Value::String(number)],
+            )
+        }
+
+        "tv_search" => {
+            if !has_cap(&cfg, "custom.tvsearch") {
+                return Err("Busca na TV não disponível neste modelo.".into());
+            }
+            let query = arg.ok_or("Texto da busca ausente")?;
+            if query.trim().is_empty() {
+                return Err("Digite algo para buscar".into());
+            }
+            (
+                "custom.tvsearch",
+                "search".to_string(),
+                vec![Value::String(query), Value::String(String::new())],
+            )
         }
 
         "launch_app" => {

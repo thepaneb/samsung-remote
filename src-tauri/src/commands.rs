@@ -90,3 +90,8 @@ pub async fn st_execute(app: AppHandle, action: String, arg: Option<String>) -> 
 pub async fn st_inputs(app: AppHandle) -> Result<Vec<StInput>, String> {
     smartthings::list_inputs(&app).await
 }
+
+#[tauri::command]
+pub async fn st_channel(app: AppHandle) -> Result<smartthings::StChannel, String> {
+    smartthings::channel_info(&app).await
+}

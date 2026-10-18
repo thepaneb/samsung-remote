@@ -129,6 +129,15 @@
                 <span class="glyph">⏩</span>
               </button>
             </div>
+
+            <div class="row row-pills">
+              <button class="key pill wide" data-key="KEY_NUMPAD" title="Ir para um canal">
+                <span class="glyph">123</span><span class="mini">Canal</span>
+              </button>
+              <button class="key pill wide" data-key="KEY_SEARCH" title="Buscar na TV">
+                <span class="glyph">🔍</span><span class="mini">Buscar</span>
+              </button>
+            </div>
           </div>
 
           <p class="hint shortcuts">
@@ -165,6 +174,53 @@
           <button class="btn ghost" id="input-close">×</button>
         </div>
         <div class="input-list" id="input-list"></div>
+      </div>
+    </div>
+
+    <div class="input-overlay hidden" id="channel-overlay">
+      <div class="input-menu card">
+        <div class="card-head">
+          <h2>Canal direto</h2>
+          <button class="btn ghost" id="channel-close">×</button>
+        </div>
+        <p class="hint" id="channel-now">—</p>
+        <div class="channel-display" id="channel-display">–</div>
+        <div class="numpad-grid">
+          <button class="input-item num-key" data-digit="1">1</button>
+          <button class="input-item num-key" data-digit="2">2</button>
+          <button class="input-item num-key" data-digit="3">3</button>
+          <button class="input-item num-key" data-digit="4">4</button>
+          <button class="input-item num-key" data-digit="5">5</button>
+          <button class="input-item num-key" data-digit="6">6</button>
+          <button class="input-item num-key" data-digit="7">7</button>
+          <button class="input-item num-key" data-digit="8">8</button>
+          <button class="input-item num-key" data-digit="9">9</button>
+          <button class="input-item num-key" data-digit=".">.</button>
+          <button class="input-item num-key" data-digit="0">0</button>
+          <button class="input-item num-key" id="channel-back" title="Apagar">←</button>
+        </div>
+        <button class="btn primary full" id="channel-go">Ir para o canal</button>
+      </div>
+    </div>
+
+    <div class="input-overlay hidden" id="search-overlay">
+      <div class="input-menu card">
+        <div class="card-head">
+          <h2>Buscar na TV</h2>
+          <button class="btn ghost" id="search-close">×</button>
+        </div>
+        <form class="inline-form" id="search-form">
+          <input
+            id="search-text"
+            placeholder="Texto para buscar na TV"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="btn primary" type="submit">Buscar</button>
+        </form>
+        <p class="hint">
+          A TV abre a tela de busca com o texto preenchido (funciona como o teclado da TV).
+        </p>
       </div>
     </div>
 
