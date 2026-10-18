@@ -33,6 +33,10 @@ const statusText = $<HTMLSpanElement>("#status-text");
 const connectedName = $<HTMLParagraphElement>("#connected-name");
 const stSetup = $<HTMLDivElement>("#st-setup");
 const stPanel = $<HTMLDivElement>("#st-panel");
+const stCard = $<HTMLElement>("#st-card");
+const stBody = $<HTMLDivElement>("#st-body");
+const stToggle = $<HTMLButtonElement>("#st-toggle");
+const stTitle = $<HTMLHeadingElement>("#st-title");
 const stForm = $<HTMLFormElement>("#st-form");
 const stTokenInput = $<HTMLInputElement>("#st-token");
 const stDeviceSelect = $<HTMLSelectElement>("#st-device");
@@ -109,6 +113,8 @@ const APP_PRESETS: TvApp[] = [
 
 let cloudActive = false;
 let cloudCaps: string[] = [];
+let stCollapsed = false;
+let stDeviceLabel: string | null = null;
 
 // ---------------------------------------------------------------------------
 // Utilidades de UI
@@ -152,23 +158,35 @@ function refreshRemoteAvailability() {
 // SmartThings
 // ---------------------------------------------------------------------------
 
+function applyStCollapsed() {
+  stBody.classList.toggle("hidden", stCollapsed);
+  stCard.classList.toggle("st-collapsed", stCollapsed);
+  stToggle.textContent = stCollapsed ? "▸" : "▾";
+  stTitle.textContent =
+    stCollapsed && stDeviceLabel ? `SmartThings • ${stDeviceLabel}` : "SmartThings";
+  stRemove.classList.toggle("hidden", !cloudActive || stCollapsed);
+}
+
 function applyStStatus(status: StStatus) {
   stSetup.classList.toggle("hidden", status.hasToken);
   stPanel.classList.toggle("hidden", !status.hasToken);
-  stRemove.classList.toggle("hidden", !status.hasToken);
+  stToggle.classList.toggle("hidden", !status.hasToken);
 
   if (status.hasToken && status.deviceId) {
     cloudActive = true;
     cloudCaps = status.capabilities;
-    const label = status.deviceLabel ?? "TV";
-    stStatusText.textContent = `Nuvem ativa: ${label} • ${status.capabilities.length} capacidades.`;
-    setStatus("connected", `Nuvem: ${label}`);
-    connectedName.textContent = `${label} • SmartThings Cloud`;
-    remoteTitle.textContent = label;
+    stDeviceLabel = status.deviceLabel ?? "TV";
+    stCollapsed = true; // já configurado: recolhe para dar menos destaque
+    stStatusText.textContent = `Nuvem ativa: ${stDeviceLabel} • ${status.capabilities.length} capacidades.`;
+    setStatus("connected", `Nuvem: ${stDeviceLabel}`);
+    connectedName.textContent = `${stDeviceLabel} • SmartThings Cloud`;
+    remoteTitle.textContent = stDeviceLabel;
     remoteHint.textContent = "Controles enviados pela nuvem do SmartThings.";
   } else {
     cloudActive = false;
     cloudCaps = [];
+    stDeviceLabel = null;
+    stCollapsed = false; // ainda não configurado: mantém expandido
     stStatusText.textContent = status.hasToken
       ? "Token salvo. Escolha a TV abaixo e clique em “Usar esta TV”."
       : "";
@@ -178,6 +196,7 @@ function applyStStatus(status: StStatus) {
     remoteHint.textContent = "Conecte sua conta SmartThings para controlar a TV.";
   }
 
+  applyStCollapsed();
   refreshRemoteAvailability();
 }
 
@@ -367,6 +386,11 @@ stRemove.addEventListener("click", async () => {
   } catch (error) {
     toast(String(error), "error");
   }
+});
+
+stToggle.addEventListener("click", () => {
+  stCollapsed = !stCollapsed;
+  applyStCollapsed();
 });
 
 // ---------------------------------------------------------------------------

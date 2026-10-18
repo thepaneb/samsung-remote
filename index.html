@@ -26,36 +26,41 @@
 
       <main class="layout">
         <aside class="col-left">
-          <section class="card">
+          <section class="card" id="st-card">
             <div class="card-head">
-              <h2>SmartThings</h2>
-              <button class="btn ghost hidden" id="st-remove">Remover token</button>
-            </div>
-
-            <div id="st-setup">
-              <form class="inline-form" id="st-form">
-                <input
-                  type="password"
-                  id="st-token"
-                  placeholder="Token pessoal do SmartThings"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-                <button class="btn primary" type="submit">Salvar</button>
-              </form>
-              <p class="hint">
-                O controle é feito pela nuvem do SmartThings. Crie um token em
-                <b>account.smartthings.com/tokens</b> com os escopos <code>r:devices:*</code> e
-                <code>x:devices:*</code>, com a TV já adicionada no app SmartThings do celular.
-              </p>
-            </div>
-
-            <div id="st-panel" class="hidden">
-              <div class="inline-form">
-                <select id="st-device"></select>
-                <button class="btn primary" id="st-use">Usar esta TV</button>
+              <h2 id="st-title">SmartThings</h2>
+              <div class="head-actions">
+                <button class="btn ghost hidden" id="st-remove">Remover token</button>
+                <button class="btn ghost hidden" id="st-toggle" title="Recolher ou expandir">▾</button>
               </div>
-              <p class="hint" id="st-status-text">—</p>
+            </div>
+
+            <div id="st-body">
+              <div id="st-setup">
+                <form class="inline-form" id="st-form">
+                  <input
+                    type="password"
+                    id="st-token"
+                    placeholder="Token pessoal do SmartThings"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <button class="btn primary" type="submit">Salvar</button>
+                </form>
+                <p class="hint">
+                  O controle é feito pela nuvem do SmartThings. Crie um token em
+                  <b>account.smartthings.com/tokens</b> com os escopos <code>r:devices:*</code> e
+                  <code>x:devices:*</code>, com a TV já adicionada no app SmartThings do celular.
+                </p>
+              </div>
+
+              <div id="st-panel" class="hidden">
+                <div class="inline-form">
+                  <select id="st-device"></select>
+                  <button class="btn primary" id="st-use">Usar esta TV</button>
+                </div>
+                <p class="hint" id="st-status-text">—</p>
+              </div>
             </div>
           </section>
 

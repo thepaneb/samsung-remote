@@ -151,7 +151,14 @@ body {
 
 @media (max-width: 1030px) {
   .layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* No celular/tablet o controle vem primeiro */
+  .col-right {
+    order: -1;
   }
 }
 
@@ -179,6 +186,21 @@ body {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.st-collapsed .card-head {
+  margin-bottom: 0;
+}
+
+.st-collapsed #st-title {
+  color: var(--text-dim);
+  font-weight: 600;
 }
 
 .card-head h2,
@@ -751,7 +773,10 @@ code {
   }
 
   .app {
-    padding: 12px 12px 20px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    padding-right: calc(12px + env(safe-area-inset-right, 0px));
     gap: 12px;
   }
 
