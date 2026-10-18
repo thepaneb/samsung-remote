@@ -14,6 +14,10 @@ local (WebSocket).
 - 📡 **Canal +/−** e **play/pause**, retroceder e avançar
 - 🔢 **Canal direto** — teclado numérico para ir a um canal (ex.: `590`, `15.1`)
 - 🔍 **Buscar na TV** — envia um texto para a tela de busca da TV (teclado alfanumérico)
+- 🎨 **Modos de imagem e som** — seletor com os modos que a TV suporta (marca o atual)
+- ⏮⏭ **Faixa anterior/próxima** e ⏹ **parar**
+- ⏺ **Gravação PVR** (botão alterna iniciar/parar; requer pendrive/HD na TV)
+- 🌙 **Modo ambiente** (`setAmbientOn`; pressione Home na TV para sair)
 - 🚀 **Atalhos de apps** (Netflix, YouTube, Prime Video, Disney+, Globoplay, Max, Spotify, Internet)
   + campo para abrir qualquer app por ID
 - ⌨️ **Atalhos de teclado**: setas = navegar • Enter = OK • Backspace = voltar • `+`/`−` volume •
@@ -104,6 +108,11 @@ O app usa a **API pública do SmartThings** (`https://api.smartthings.com/v1`) c
 | Fonte | `samsungvd.mediaInputSource.setInputSource` (lista com os nomes das entradas) |
 | Canal | `tvChannel` (`channelUp`/`channelDown`/`setTvChannel`) |
 | Buscar na TV | `custom.tvsearch.search` (texto) |
+| Modos de imagem/som | `custom.picturemode` / `custom.soundmode` (`setPictureMode`/`setSoundMode`) |
+| Faixa anterior/próxima | `mediaTrackControl` (`previousTrack`/`nextTrack`) |
+| Parar | `mediaPlayback.stop` (ou tecla `STOP`) |
+| Gravação PVR | `custom.recording` (`recordStart`/`recordStop`) |
+| Modo ambiente | `samsungvd.ambient.setAmbientOn` |
 | Play/Pause, ⏪, ⏩ | `samsungvd.remoteControl.send PLAY_BACK/REWIND/FF` (ou `mediaPlayback`) |
 | Abrir app | `custom.launchapp.launchApp` com o appId |
 
