@@ -10,7 +10,7 @@ use std::time::Duration;
 use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
 use native_tls::TlsConnector;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, Mutex};
@@ -40,6 +40,8 @@ pub struct Session {
 #[derive(Default)]
 pub struct AppState {
     pub session: Mutex<Option<Session>>,
+    /// Aguardando a resposta `ed.installedApp.get` da TV.
+    pub apps_waiters: Mutex<Vec<tokio::sync::oneshot::Sender<Vec<TvApp>>>>,
 }
 
 #[derive(Clone, Serialize)]
@@ -111,7 +113,80 @@ pub fn text_message(text: &str) -> String {
     .to_string()
 }
 
-pub fn launch_message(app_id: &str) -> String {
+// ---------------------------------------------------------------------------
+// Apps (lista via WebSocket autorizado ou REST com token)
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TvApp {
+    pub app_id: String,
+    pub name: String,
+    pub icon: Option<String>,
+    #[serde(default)]
+    pub app_type: Option<i64>,
+}
+
+/// Requisição da lista de apps pelo canal WebSocket (a TV responde com um
+/// evento `ed.installedApp.get`, tratado em `run_session`).
+pub fn apps_request_message() -> String {
+    serde_json::json!({
+        "method": "ms.channel.emit",
+        "params": {
+            "event": "ed.installedApp.get",
+            "to": "host"
+        }
+    })
+    .to_string()
+}
+
+/// Extrai a lista de apps de um payload da TV (WebSocket ou REST).
+pub fn parse_apps(value: &serde_json::Value) -> Vec<TvApp> {
+    let entries = value
+        .get("data")
+        .and_then(|d| d.get("data"))
+        .or_else(|| value.get("applications"))
+        .or_else(|| value.get("data"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    entries
+        .iter()
+        .filter_map(|entry| {
+            let app_id = entry.get("appId").and_then(|v| v.as_str())?.to_string();
+            if app_id.trim().is_empty() {
+                return None;
+            }
+            let name = entry
+                .get("name")
+                .or_else(|| entry.get("appName"))
+                .and_then(|v| v.as_str())
+                .unwrap_or(app_id.as_str())
+                .to_string();
+            let icon = entry
+                .get("icon")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
+            let app_type = entry.get("app_type").and_then(|v| v.as_i64());
+            Some(TvApp {
+                app_id,
+                name,
+                icon,
+                app_type,
+            })
+        })
+        .collect()
+}
+
+pub fn launch_message(app_id: &str, app_type: Option<i64>) -> String {
+    // apps do tipo 2 usam DEEP_LINK; os demais, NATIVE_LAUNCH (regra da
+    // comunidade samsungtvws). Sem a informação, DEEP_LINK é o padrão.
+    let action = match app_type {
+        Some(2) | None => "DEEP_LINK",
+        Some(_) => "NATIVE_LAUNCH",
+    };
     serde_json::json!({
         "method": "ms.channel.emit",
         "params": {
@@ -119,7 +194,7 @@ pub fn launch_message(app_id: &str) -> String {
             "to": "host",
             "data": {
                 "appId": app_id,
-                "action_type": "DEEP_LINK",
+                "action_type": action,
                 "metaTag": ""
             }
         }
@@ -304,6 +379,31 @@ pub async fn establish(
 // Sessão ativa
 // ---------------------------------------------------------------------------
 
+/// Trata mensagens recebidas da TV: encaminha o JSON bruto ao frontend e
+/// resolve esperas específicas (ex.: lista de apps).
+async fn handle_incoming(app: &AppHandle, txt: &str) {
+    let _ = app.emit("tv://message", txt);
+
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(txt) else {
+        return;
+    };
+
+    if value.get("event").and_then(|e| e.as_str()) == Some("ed.installedApp.get") {
+        let apps = parse_apps(&value);
+        if apps.is_empty() {
+            return;
+        }
+        let state = app.state::<AppState>();
+        let waiter = {
+            let mut guard = state.apps_waiters.lock().await;
+            guard.pop()
+        };
+        if let Some(tx) = waiter {
+            let _ = tx.send(apps);
+        }
+    }
+}
+
 /// Loop de leitura/escrita da sessão. Termina quando o canal fecha ou quando
 /// o remetente de comandos é descartado (desconexão pedida pela interface).
 pub async fn run_session(
@@ -320,7 +420,7 @@ pub async fn run_session(
             incoming = stream.next() => match incoming {
                 None => break "A TV encerrou a conexão".to_string(),
                 Some(Ok(Message::Text(txt))) => {
-                    let _ = app.emit("tv://message", txt.as_str());
+                    handle_incoming(&app, txt.as_str()).await;
                 }
                 Some(Ok(Message::Ping(payload))) => {
                     if sink.send(Message::Pong(payload)).await.is_err() {

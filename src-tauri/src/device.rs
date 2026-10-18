@@ -66,6 +66,7 @@ fn parse(ip: &str, v: &serde_json::Value) -> Option<TvDevice> {
 pub async fn fetch_device_info(ip: &str) -> Option<TvDevice> {
     let client = http_client(4)?;
     for url in [
+        format!("http://{ip}:8001/api/v2/"),
         format!("http://{ip}:8000/api/v2/"),
         format!("https://{ip}:8002/api/v2/"),
     ] {

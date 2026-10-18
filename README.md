@@ -65,11 +65,11 @@ Os artefatos ficam em `src-tauri/target/release/bundle` (`.msi`/`.exe` no Window
 ## Como funciona (protocolo)
 
 - **Descoberta:** SSDP `M-SEARCH` em `239.255.255.250:1900`, alvo `urn:samsung.com:device:RemoteControlReceiver:1`.
-- **Informações:** `GET http://IP:8000/api/v2/` (nome, modelo, MAC, `PowerState`).
+- **Informações:** `GET http://IP:8001/api/v2/` (nome, modelo, MAC, `PowerState`), com fallback para `:8000` e `https://:8002` em modelos mais antigos/novos.
 - **Controle:** WebSocket `ws://IP:8001/api/v2/channels/samsung.remote.control?name=<base64>`, com fallback para `wss://IP:8002` (certificado autoassinado).
 - **Teclas:** `{"method":"ms.remote.control","params":{"Cmd":"Click","DataOfCmd":"KEY_...","TypeOfRemote":"SendRemoteKey"}}`.
 - **Texto:** `SendInputString` (com o broadcast `custom.remote.textReceived` antes, exigido por alguns modelos).
-- **Apps:** `GET http://IP:8001/api/v2/applications` + `ms.channel.emit` / `ed.apps.launch`.
+- **Apps:** pedido pelo canal WebSocket (`ms.channel.emit` → `ed.installedApp.get`) e fallback REST `GET /api/v2/applications?token=...`; lançamento via `ed.apps.launch`.
 - **Pareamento:** a TV devolve o token em `ms.channel.connect`; ele é salvo em `devices.json` na pasta de dados do app.
 
 ## Estrutura do projeto

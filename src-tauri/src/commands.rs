@@ -3,7 +3,6 @@
 use std::time::Duration;
 
 use futures_util::future::join_all;
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::mpsc;
 
@@ -12,14 +11,6 @@ use crate::ssdp;
 use crate::store::{self, StoredDevice};
 use crate::tv::{self, AppState};
 use crate::wol;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct TvApp {
-    pub app_id: String,
-    pub name: String,
-    pub icon: Option<String>,
-}
 
 fn from_stored(stored: StoredDevice) -> TvDevice {
     TvDevice {
@@ -247,8 +238,12 @@ pub async fn send_text(state: State<'_, AppState>, text: String) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn launch_app(state: State<'_, AppState>, app_id: String) -> Result<(), String> {
-    send_raw(&state, tv::launch_message(&app_id)).await
+pub async fn launch_app(
+    state: State<'_, AppState>,
+    app_id: String,
+    app_type: Option<i64>,
+) -> Result<(), String> {
+    send_raw(&state, tv::launch_message(&app_id, app_type)).await
 }
 
 // ---------------------------------------------------------------------------
@@ -256,57 +251,52 @@ pub async fn launch_app(state: State<'_, AppState>, app_id: String) -> Result<()
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-pub async fn list_apps(ip: String) -> Result<Vec<TvApp>, String> {
+pub async fn list_apps(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    ip: String,
+) -> Result<Vec<tv::TvApp>, String> {
+    // 1) Caminho preferido: canal WebSocket já autorizado (a TV responde com
+    //    o evento `ed.installedApp.get`). Funciona mesmo quando a REST exige
+    //    token, como acontece em vários modelos.
+    let connected = state.session.lock().await.is_some();
+    if connected {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Vec<tv::TvApp>>();
+        state.apps_waiters.lock().await.push(tx);
+
+        if send_raw(&state, tv::apps_request_message()).await.is_ok() {
+            match tokio::time::timeout(Duration::from_secs(8), rx).await {
+                Ok(Ok(apps)) if !apps.is_empty() => return Ok(apps),
+                _ => state.apps_waiters.lock().await.clear(),
+            }
+        } else {
+            state.apps_waiters.lock().await.clear();
+        }
+    }
+
+    // 2) Fallback REST (com token, quando houver)
+    let token = store::find(&app, &ip).and_then(|s| s.token);
     let client = device::http_client(8).ok_or("Falha ao preparar o cliente HTTP")?;
+    let token_query = token.map(|t| format!("?token={t}")).unwrap_or_default();
 
-    let urls = [
-        format!("http://{ip}:8001/api/v2/applications"),
-        format!("http://{ip}:8000/api/v2/applications"),
-        format!("https://{ip}:8002/api/v2/applications"),
-    ];
-
-    for url in urls {
+    for url in [
+        format!("http://{ip}:8001/api/v2/applications{token_query}"),
+        format!("http://{ip}:8000/api/v2/applications{token_query}"),
+        format!("https://{ip}:8002/api/v2/applications{token_query}"),
+    ] {
         let Ok(response) = client.get(&url).send().await else {
             continue;
         };
         let Ok(value) = response.json::<serde_json::Value>().await else {
             continue;
         };
-
-        let entries = value
-            .get("applications")
-            .or_else(|| value.get("data"))
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-
-        let apps: Vec<TvApp> = entries
-            .iter()
-            .filter_map(|entry| {
-                let app_id = entry.get("appId").and_then(|v| v.as_str())?.to_string();
-                if app_id.is_empty() {
-                    return None;
-                }
-                let name = entry
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or(app_id.as_str())
-                    .to_string();
-                let icon = entry
-                    .get("icon")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                    .map(str::to_string);
-                Some(TvApp { app_id, name, icon })
-            })
-            .collect();
-
+        let apps = tv::parse_apps(&value);
         if !apps.is_empty() {
             return Ok(apps);
         }
     }
 
-    Err("Não foi possível listar os apps da TV.".to_string())
+    Err("Não foi possível obter a lista de apps da TV.".to_string())
 }
 
 #[tauri::command]

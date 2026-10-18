@@ -17,6 +17,7 @@ interface TvApp {
   appId: string;
   name: string;
   icon?: string | null;
+  appType?: number | null;
 }
 
 type StatusState = "connecting" | "waiting" | "connected" | "disconnected" | "error";
@@ -245,7 +246,7 @@ function renderApps(apps: TvApp[]) {
       const icon = app.icon
         ? `<img src="${esc(app.icon)}" alt="" data-name="${esc(app.name)}" loading="lazy" />`
         : `<span class="app-fallback">${esc(app.name.slice(0, 1).toUpperCase() || "?")}</span>`;
-      return `<button class="app-tile" data-app-id="${esc(app.appId)}" title="${esc(app.name)}">${icon}<span class="app-name">${esc(app.name)}</span></button>`;
+      return `<button class="app-tile" data-app-id="${esc(app.appId)}" data-app-type="${app.appType ?? ""}" title="${esc(app.name)}">${icon}<span class="app-name">${esc(app.name)}</span></button>`;
     })
     .join("");
 
@@ -330,7 +331,8 @@ appGrid.addEventListener("click", (event) => {
   const tile = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-app-id]");
   const appId = tile?.dataset.appId;
   if (!appId) return;
-  void invoke("launch_app", { appId })
+  const appType = tile?.dataset.appType ? Number(tile.dataset.appType) : null;
+  void invoke("launch_app", { appId, appType })
     .then(() => toast("App iniciado na TV.", "success"))
     .catch((error) => toast(String(error), "error"));
 });
