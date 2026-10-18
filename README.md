@@ -76,6 +76,8 @@ dispositivo é descoberto ao selecionar a TV e salvo em `smartthings.json` (past
 | Atalho abre o app errado | IDs variam por região/ano — use o campo de ID personalizado com o código correto do seu modelo. |
 | Tecla apagada | A TV não expõe a capacidade correspondente no SmartThings; não há como enviar essa tecla pela nuvem. |
 | Comando não faz efeito | Verifique se a TV está ligada e conectada à internet (o caminho é pela nuvem do SmartThings). |
+| O indicador de entrada atual não acompanha trocas feitas direto na TV | Nesses modelos a nuvem congela o estado de entrada/energia. O app mantém memória própria das últimas ações feitas **por ele** e sincroniza quando a nuvem atualiza. |
+| Power alterna ao contrário (1º clique não faz o esperado) | Mesma causa acima — o app alterna com base no último estado conhecido; um clique extra resolve. |
 
 ## Estrutura do projeto
 
