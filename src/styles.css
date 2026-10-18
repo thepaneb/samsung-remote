@@ -47,63 +47,25 @@ body {
   gap: 16px;
 }
 
-/* ---------------------------------------------------------------- topbar */
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.brand-badge {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  font-weight: 800;
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent-2), #0ea5e9);
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35);
-}
-
-.brand h1 {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
-.brand-sub {
-  margin: 2px 0 0;
-  font-size: 0.82rem;
-  color: var(--text-dim);
-}
+/* ------------------------------------------------------------ status pill */
 
 .status-pill {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 16px;
+  gap: 7px;
+  padding: 5px 12px;
   border-radius: 999px;
-  background: var(--card);
+  background: #0d1320;
   border: 1px solid var(--key-border);
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   color: var(--text-dim);
   transition: border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
 }
 
 .status-pill .dot {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #64748b;
 }
@@ -145,8 +107,31 @@ body {
   flex: 1;
   display: grid;
   grid-template-columns: 390px minmax(0, 1fr);
+  grid-template-areas:
+    "st remote"
+    "apps remote";
   gap: 16px;
   align-items: start;
+}
+
+#st-card {
+  grid-area: st;
+}
+
+#remote-card {
+  grid-area: remote;
+}
+
+#apps-card {
+  grid-area: apps;
+}
+
+.st-head-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 1030px) {
@@ -156,18 +141,18 @@ body {
     gap: 16px;
   }
 
-  /* No celular/tablet o controle vem primeiro */
-  .col-right {
-    order: -1;
+  /* No celular: painel SmartThings (compacto) → controle → apps */
+  #st-card {
+    order: 0;
   }
-}
 
-.col-left,
-.col-right {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
+  #remote-card {
+    order: 1;
+  }
+
+  #apps-card {
+    order: 2;
+  }
 }
 
 /* ----------------------------------------------------------------- cards */
@@ -780,10 +765,8 @@ code {
     gap: 12px;
   }
 
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+  .shortcuts {
+    display: none;
   }
 
   .card {

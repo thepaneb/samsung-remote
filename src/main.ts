@@ -30,13 +30,11 @@ const $ = <T extends HTMLElement>(selector: string): T =>
 
 const statusPill = $<HTMLDivElement>("#status-pill");
 const statusText = $<HTMLSpanElement>("#status-text");
-const connectedName = $<HTMLParagraphElement>("#connected-name");
 const stSetup = $<HTMLDivElement>("#st-setup");
 const stPanel = $<HTMLDivElement>("#st-panel");
 const stCard = $<HTMLElement>("#st-card");
 const stBody = $<HTMLDivElement>("#st-body");
 const stToggle = $<HTMLButtonElement>("#st-toggle");
-const stTitle = $<HTMLHeadingElement>("#st-title");
 const stForm = $<HTMLFormElement>("#st-form");
 const stTokenInput = $<HTMLInputElement>("#st-token");
 const stDeviceSelect = $<HTMLSelectElement>("#st-device");
@@ -162,8 +160,6 @@ function applyStCollapsed() {
   stBody.classList.toggle("hidden", stCollapsed);
   stCard.classList.toggle("st-collapsed", stCollapsed);
   stToggle.textContent = stCollapsed ? "▸" : "▾";
-  stTitle.textContent =
-    stCollapsed && stDeviceLabel ? `SmartThings • ${stDeviceLabel}` : "SmartThings";
   stRemove.classList.toggle("hidden", !cloudActive || stCollapsed);
 }
 
@@ -179,7 +175,6 @@ function applyStStatus(status: StStatus) {
     stCollapsed = true; // já configurado: recolhe para dar menos destaque
     stStatusText.textContent = `Nuvem ativa: ${stDeviceLabel} • ${status.capabilities.length} capacidades.`;
     setStatus("connected", `Nuvem: ${stDeviceLabel}`);
-    connectedName.textContent = `${stDeviceLabel} • SmartThings Cloud`;
     remoteTitle.textContent = stDeviceLabel;
     remoteHint.textContent = "Controles enviados pela nuvem do SmartThings.";
   } else {
@@ -191,7 +186,6 @@ function applyStStatus(status: StStatus) {
       ? "Token salvo. Escolha a TV abaixo e clique em “Usar esta TV”."
       : "";
     setStatus("idle", status.hasToken ? "Escolha a TV" : "Não configurado");
-    connectedName.textContent = "Modo nuvem (SmartThings)";
     remoteTitle.textContent = "Controle";
     remoteHint.textContent = "Conecte sua conta SmartThings para controlar a TV.";
   }

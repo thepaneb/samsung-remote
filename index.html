@@ -10,157 +10,145 @@
 
   <body>
     <div class="app">
-      <header class="topbar">
-        <div class="brand">
-          <span class="brand-badge">TV</span>
-          <div>
-            <h1>Controle Remoto Samsung</h1>
-            <p class="brand-sub" id="connected-name">Modo nuvem (SmartThings)</p>
-          </div>
-        </div>
-        <div class="status-pill" id="status-pill" data-state="idle">
-          <span class="dot"></span>
-          <span id="status-text">Não configurado</span>
-        </div>
-      </header>
-
       <main class="layout">
-        <aside class="col-left">
-          <section class="card" id="st-card">
-            <div class="card-head">
+        <section class="card" id="st-card">
+          <div class="card-head">
+            <div class="st-head-info">
               <h2 id="st-title">SmartThings</h2>
-              <div class="head-actions">
-                <button class="btn ghost hidden" id="st-remove">Remover token</button>
-                <button class="btn ghost hidden" id="st-toggle" title="Recolher ou expandir">▾</button>
+              <div class="status-pill" id="status-pill" data-state="idle">
+                <span class="dot"></span>
+                <span id="status-text">Não configurado</span>
               </div>
             </div>
-
-            <div id="st-body">
-              <div id="st-setup">
-                <form class="inline-form" id="st-form">
-                  <input
-                    type="password"
-                    id="st-token"
-                    placeholder="Token pessoal do SmartThings"
-                    autocomplete="off"
-                    spellcheck="false"
-                  />
-                  <button class="btn primary" type="submit">Salvar</button>
-                </form>
-                <p class="hint">
-                  O controle é feito pela nuvem do SmartThings. Crie um token em
-                  <b>account.smartthings.com/tokens</b> com os escopos <code>r:devices:*</code> e
-                  <code>x:devices:*</code>, com a TV já adicionada no app SmartThings do celular.
-                </p>
-              </div>
-
-              <div id="st-panel" class="hidden">
-                <div class="inline-form">
-                  <select id="st-device"></select>
-                  <button class="btn primary" id="st-use">Usar esta TV</button>
-                </div>
-                <p class="hint" id="st-status-text">—</p>
-              </div>
+            <div class="head-actions">
+              <button class="btn ghost hidden" id="st-remove">Remover token</button>
+              <button class="btn ghost hidden" id="st-toggle" title="Recolher ou expandir">▾</button>
             </div>
-          </section>
-
-          <section class="card">
-            <div class="card-head">
-              <h2>Atalhos de apps</h2>
-            </div>
-            <div class="app-grid" id="app-grid"></div>
-            <form class="inline-form" id="app-custom-form">
-              <input
-                id="app-custom-id"
-                placeholder="ID do app (ex.: 11101200001)"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button class="btn" type="submit">Abrir</button>
-            </form>
-            <p class="hint">
-              Os IDs variam por região/ano da TV. Se algum abrir o app errado, tente outro ID.
-            </p>
-          </section>
-        </aside>
-
-        <section class="col-right">
-          <div class="card remote-card">
-            <div class="remote-top">
-              <div>
-                <h2 id="remote-title">Controle</h2>
-                <p class="hint" id="remote-hint">
-                  Conecte sua conta SmartThings para controlar a TV.
-                </p>
-              </div>
-            </div>
-
-            <div class="remote-body disabled" id="remote-body">
-              <div class="row row-top">
-                <button class="key round power" data-key="KEY_POWER" title="Ligar/desligar">⏻</button>
-                <button class="key round" data-key="KEY_SOURCE" title="Trocar entrada">
-                  <span class="glyph">⧉</span><span class="mini">Fonte</span>
-                </button>
-                <button class="key round" data-key="KEY_HOME" title="Início">
-                  <span class="glyph">⌂</span>
-                </button>
-                <button class="key round" data-key="KEY_MUTE" title="Mudo">
-                  <span class="glyph">🔇</span>
-                </button>
-              </div>
-
-              <div class="row row-main">
-                <div class="rocker">
-                  <button class="key" data-key="KEY_CHUP" title="Canal +">＋</button>
-                  <span class="rocker-label">CANAL</span>
-                  <button class="key" data-key="KEY_CHDOWN" title="Canal −">－</button>
-                </div>
-
-                <div class="dpad">
-                  <button class="key dpad-key up" data-key="KEY_UP" title="Cima">▲</button>
-                  <button class="key dpad-key left" data-key="KEY_LEFT" title="Esquerda">◀</button>
-                  <button class="key dpad-ok" data-key="KEY_ENTER" title="OK">OK</button>
-                  <button class="key dpad-key right" data-key="KEY_RIGHT" title="Direita">▶</button>
-                  <button class="key dpad-key down" data-key="KEY_DOWN" title="Baixo">▼</button>
-                </div>
-
-                <div class="rocker">
-                  <button class="key" data-key="KEY_VOLUP" title="Volume +">＋</button>
-                  <span class="rocker-label">VOL</span>
-                  <button class="key" data-key="KEY_VOLDOWN" title="Volume −">－</button>
-                </div>
-              </div>
-
-              <div class="row row-pills">
-                <button class="key pill" data-key="KEY_RETURN">
-                  <span class="glyph">↩</span><span class="mini">Voltar</span>
-                </button>
-                <button class="key pill" data-key="KEY_MENU">
-                  <span class="glyph">☰</span><span class="mini">Menu</span>
-                </button>
-                <button class="key pill" data-key="KEY_EXIT">
-                  <span class="glyph">⏏</span><span class="mini">Sair</span>
-                </button>
-              </div>
-
-              <div class="row row-pills">
-                <button class="key pill" data-key="KEY_REWIND" title="Retroceder">
-                  <span class="glyph">⏪</span>
-                </button>
-                <button class="key pill" data-key="KEY_PLAY_BACK" title="Reproduzir/Pausar">
-                  <span class="glyph">⏯</span>
-                </button>
-                <button class="key pill" data-key="KEY_FF" title="Avançar">
-                  <span class="glyph">⏩</span>
-                </button>
-              </div>
-            </div>
-
-            <p class="hint shortcuts">
-              Atalhos do teclado: setas = navegar • Enter = OK • Backspace = voltar • +/− volume •
-              M = mudo • Espaço = play/pause • H = início
-            </p>
           </div>
+
+          <div id="st-body">
+            <div id="st-setup">
+              <form class="inline-form" id="st-form">
+                <input
+                  type="password"
+                  id="st-token"
+                  placeholder="Token pessoal do SmartThings"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button class="btn primary" type="submit">Salvar</button>
+              </form>
+              <p class="hint">
+                O controle é feito pela nuvem do SmartThings. Crie um token em
+                <b>account.smartthings.com/tokens</b> com os escopos <code>r:devices:*</code> e
+                <code>x:devices:*</code>, com a TV já adicionada no app SmartThings do celular.
+              </p>
+            </div>
+
+            <div id="st-panel" class="hidden">
+              <div class="inline-form">
+                <select id="st-device"></select>
+                <button class="btn primary" id="st-use">Usar esta TV</button>
+              </div>
+              <p class="hint" id="st-status-text">—</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="card remote-card" id="remote-card">
+          <div class="remote-top">
+            <div>
+              <h2 id="remote-title">Controle</h2>
+              <p class="hint" id="remote-hint">
+                Conecte sua conta SmartThings para controlar a TV.
+              </p>
+            </div>
+          </div>
+
+          <div class="remote-body disabled" id="remote-body">
+            <div class="row row-top">
+              <button class="key round power" data-key="KEY_POWER" title="Ligar/desligar">⏻</button>
+              <button class="key round" data-key="KEY_SOURCE" title="Trocar entrada">
+                <span class="glyph">⧉</span><span class="mini">Fonte</span>
+              </button>
+              <button class="key round" data-key="KEY_HOME" title="Início">
+                <span class="glyph">⌂</span>
+              </button>
+              <button class="key round" data-key="KEY_MUTE" title="Mudo">
+                <span class="glyph">🔇</span>
+              </button>
+            </div>
+
+            <div class="row row-main">
+              <div class="rocker">
+                <button class="key" data-key="KEY_CHUP" title="Canal +">＋</button>
+                <span class="rocker-label">CANAL</span>
+                <button class="key" data-key="KEY_CHDOWN" title="Canal −">－</button>
+              </div>
+
+              <div class="dpad">
+                <button class="key dpad-key up" data-key="KEY_UP" title="Cima">▲</button>
+                <button class="key dpad-key left" data-key="KEY_LEFT" title="Esquerda">◀</button>
+                <button class="key dpad-ok" data-key="KEY_ENTER" title="OK">OK</button>
+                <button class="key dpad-key right" data-key="KEY_RIGHT" title="Direita">▶</button>
+                <button class="key dpad-key down" data-key="KEY_DOWN" title="Baixo">▼</button>
+              </div>
+
+              <div class="rocker">
+                <button class="key" data-key="KEY_VOLUP" title="Volume +">＋</button>
+                <span class="rocker-label">VOL</span>
+                <button class="key" data-key="KEY_VOLDOWN" title="Volume −">－</button>
+              </div>
+            </div>
+
+            <div class="row row-pills">
+              <button class="key pill" data-key="KEY_RETURN">
+                <span class="glyph">↩</span><span class="mini">Voltar</span>
+              </button>
+              <button class="key pill" data-key="KEY_MENU">
+                <span class="glyph">☰</span><span class="mini">Menu</span>
+              </button>
+              <button class="key pill" data-key="KEY_EXIT">
+                <span class="glyph">⏏</span><span class="mini">Sair</span>
+              </button>
+            </div>
+
+            <div class="row row-pills">
+              <button class="key pill" data-key="KEY_REWIND" title="Retroceder">
+                <span class="glyph">⏪</span>
+              </button>
+              <button class="key pill" data-key="KEY_PLAY_BACK" title="Reproduzir/Pausar">
+                <span class="glyph">⏯</span>
+              </button>
+              <button class="key pill" data-key="KEY_FF" title="Avançar">
+                <span class="glyph">⏩</span>
+              </button>
+            </div>
+          </div>
+
+          <p class="hint shortcuts">
+            Atalhos do teclado: setas = navegar • Enter = OK • Backspace = voltar • +/− volume •
+            M = mudo • Espaço = play/pause • H = início
+          </p>
+        </section>
+
+        <section class="card" id="apps-card">
+          <div class="card-head">
+            <h2>Atalhos de apps</h2>
+          </div>
+          <div class="app-grid" id="app-grid"></div>
+          <form class="inline-form" id="app-custom-form">
+            <input
+              id="app-custom-id"
+              placeholder="ID do app (ex.: 11101200001)"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button class="btn" type="submit">Abrir</button>
+          </form>
+          <p class="hint">
+            Os IDs variam por região/ano da TV. Se algum abrir o app errado, tente outro ID.
+          </p>
         </section>
       </main>
     </div>
