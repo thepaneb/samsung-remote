@@ -56,7 +56,45 @@
             </div>
             <div class="app-grid" id="app-grid"></div>
             <p class="empty" id="apps-empty">Conecte-se a uma TV para carregar os aplicativos.</p>
+            <form class="inline-form hidden" id="app-custom-form">
+              <input id="app-custom-id" placeholder="ID do app (ex.: 3201512006785)" autocomplete="off" spellcheck="false" />
+              <button class="btn" type="submit">Abrir</button>
+            </form>
           </section>
+
+          <section class="card">
+            <div class="card-head">
+              <h2>Modo nuvem (SmartThings)</h2>
+              <button class="btn ghost hidden" id="st-remove">Remover token</button>
+            </div>
+
+            <div id="st-setup">
+              <form class="inline-form" id="st-form">
+                <input
+                  type="password"
+                  id="st-token"
+                  placeholder="Token pessoal do SmartThings"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button class="btn" type="submit">Salvar</button>
+              </form>
+              <p class="hint">
+                Alternativa quando a TV recusa o controle local: crie um token em
+                <b>account.smartthings.com/tokens</b> (escopos <code>r:devices:*</code> e
+                <code>x:devices:*</code>), com a TV já adicionada no app SmartThings.
+              </p>
+            </div>
+
+            <div id="st-panel" class="hidden">
+              <div class="inline-form">
+                <select id="st-device"></select>
+                <button class="btn" id="st-use">Usar esta TV</button>
+              </div>
+              <p class="hint" id="st-status-text">—</p>
+            </div>
+          </section>
+        </aside>
 
           <section class="card">
             <div class="card-head">

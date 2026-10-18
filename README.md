@@ -13,6 +13,7 @@ Feito com **Tauri 2** (Rust no backend, TypeScript no frontend).
 - ⌨️ **Envio de texto** para o campo aberto na TV (busca do YouTube/Netflix etc.)
 - 📺 **Lista de apps** da TV com ícones, para abrir com um clique
 - ⏻ **Wake-on-LAN** para ligar a TV desligada pelo MAC
+- ☁️ **Modo nuvem (SmartThings)** como alternativa quando a TV recusa o pareamento local
 - ⌨️ **Atalhos de teclado**: setas, Enter, Backspace, `+`/`−`, `M`, `Espaço`, `P`, `H`
 
 ## Requisitos
@@ -51,6 +52,23 @@ Os artefatos ficam em `src-tauri/target/release/bundle` (`.msi`/`.exe` no Window
 - Na TV: **Configurações → Geral → Rede → Configurações avançadas → “Ligar com celular” (Power On with Mobile)** = ativado. O nome varia conforme o modelo/ano.
 - Funciona de forma mais confiável com **cabo de rede**; via Wi-Fi depende do modelo.
 - No app, clique no botão **⏻** ao lado da TV na lista.
+
+### Modo nuvem (plano B, SmartThings)
+
+Se a TV **recusar o pareamento local** (ver solução de problemas abaixo), o app oferece um
+modo alternativo de controle pela **nuvem do SmartThings**:
+
+1. Adicione a TV no app **SmartThings** do celular (sua conta Samsung) — se ela já aparece lá, pronto.
+2. Crie um **token pessoal** em <https://account.smartthings.com/tokens>:
+   - Nome: `Controle Tauri`
+   - Escopos: **`r:devices:*`** e **`x:devices:*`** (e `r:locations:*` se aparecer)
+3. No app (Tauri), cole o token no cartão **“Modo nuvem (SmartThings)”** e clique em **Salvar**.
+4. Escolha sua TV na lista e clique em **“Usar esta TV”**.
+
+Teclas disponíveis no modo nuvem (dependem das capacidades que a TV expõe): **power**,
+**volume**, **mudo**, **canal**, **play/pause**, **rewind**, **avançar**, **trocar de entrada**
+(ciclo) e **abrir apps** (com IDs predefinidos ou um ID digitado). Teclas de navegação (D-pad),
+menu, números e texto existem apenas no modo local.
 
 ## Solução de problemas
 

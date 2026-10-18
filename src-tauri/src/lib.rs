@@ -1,5 +1,6 @@
 mod commands;
 mod device;
+mod smartthings;
 mod ssdp;
 mod store;
 mod tv;
@@ -24,6 +25,12 @@ pub fn run() {
             commands::launch_app,
             commands::list_apps,
             commands::power_state,
+            commands::st_status,
+            commands::st_set_token,
+            commands::st_list_devices,
+            commands::st_select_device,
+            commands::st_clear,
+            commands::st_execute,
         ])
         .setup(|app| {
             if let Ok(dir) = app.path().app_data_dir() {

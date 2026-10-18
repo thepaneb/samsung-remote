@@ -20,6 +20,20 @@ interface TvApp {
   appType?: number | null;
 }
 
+interface StDevice {
+  deviceId: string;
+  label: string;
+  deviceType?: string | null;
+  capabilities: string[];
+}
+
+interface StStatus {
+  hasToken: boolean;
+  deviceId?: string | null;
+  deviceLabel?: string | null;
+  capabilities: string[];
+}
+
 type StatusState = "connecting" | "waiting" | "connected" | "disconnected" | "error";
 
 interface Status {
@@ -53,10 +67,57 @@ const disconnectBtn = $<HTMLButtonElement>("#disconnect-btn");
 const numpad = $<HTMLDivElement>("#numpad");
 const numpadToggle = $<HTMLButtonElement>("#numpad-toggle");
 const toastStack = $<HTMLDivElement>("#toast-stack");
+const stSetup = $<HTMLDivElement>("#st-setup");
+const stPanel = $<HTMLDivElement>("#st-panel");
+const stForm = $<HTMLFormElement>("#st-form");
+const stTokenInput = $<HTMLInputElement>("#st-token");
+const stDeviceSelect = $<HTMLSelectElement>("#st-device");
+const stUse = $<HTMLButtonElement>("#st-use");
+const stRemove = $<HTMLButtonElement>("#st-remove");
+const stStatusText = $<HTMLParagraphElement>("#st-status-text");
+const appCustomForm = $<HTMLFormElement>("#app-custom-form");
+const appCustomId = $<HTMLInputElement>("#app-custom-id");
+
+// Teclas que o modo nuvem consegue enviar (mapeadas para capacidades SmartThings)
+const CLOUD_KEY_ACTIONS: Record<string, string> = {
+  KEY_POWER: "power_toggle",
+  KEY_VOLUP: "volume_up",
+  KEY_VOLDOWN: "volume_down",
+  KEY_MUTE: "mute_toggle",
+  KEY_CHUP: "channel_up",
+  KEY_CHDOWN: "channel_down",
+  KEY_PLAY_BACK: "play_pause",
+  KEY_REWIND: "rewind",
+  KEY_FF: "fast_forward",
+  KEY_SOURCE: "cycle_input",
+};
+
+const CLOUD_KEY_CAPABILITY: Record<string, string> = {
+  KEY_POWER: "switch",
+  KEY_VOLUP: "audioVolume",
+  KEY_VOLDOWN: "audioVolume",
+  KEY_MUTE: "audioMute",
+  KEY_CHUP: "tvChannel",
+  KEY_CHDOWN: "tvChannel",
+  KEY_PLAY_BACK: "mediaPlayback",
+  KEY_REWIND: "mediaPlayback",
+  KEY_FF: "mediaPlayback",
+  KEY_SOURCE: "mediaInputSource",
+};
+
+// Atalhos comuns (usados no modo nuvem, onde não é possível listar os apps da TV)
+const APP_PRESETS: TvApp[] = [
+  { appId: "3201512006785", name: "Netflix" },
+  { appId: "111299001912", name: "YouTube" },
+  { appId: "3201910019365", name: "Prime Video" },
+  { appId: "3201606009684", name: "Spotify" },
+];
 
 const devices = new Map<string, TvDevice>();
 let sessionIp: string | null = null;
 let waitingToastShown = false;
+let cloudActive = false;
+let cloudCaps: string[] = [];
 
 // ---------------------------------------------------------------------------
 // Utilidades de UI
@@ -85,12 +146,27 @@ function setStatus(state: StatusState | "idle", text: string) {
   statusText.textContent = text;
 }
 
-function setRemoteEnabled(enabled: boolean) {
-  remoteBody.classList.toggle("disabled", !enabled);
-  disconnectBtn.disabled = !enabled;
-  appsRefresh.disabled = !enabled;
-  textInput.disabled = !enabled;
-  textSend.disabled = !enabled;
+function setRemoteEnabled(_enabled: boolean) {
+  refreshRemoteAvailability();
+}
+
+function refreshRemoteAvailability() {
+  const local = sessionIp !== null;
+  const usable = local || cloudActive;
+
+  remoteBody.classList.toggle("disabled", !usable);
+  disconnectBtn.disabled = !local;
+  appsRefresh.disabled = !usable;
+  textInput.disabled = !local;
+  textSend.disabled = !local;
+  appCustomForm.classList.toggle("hidden", !usable);
+
+  remoteBody.querySelectorAll<HTMLButtonElement>("button.key[data-key]").forEach((button) => {
+    const key = button.dataset.key ?? "";
+    const capability = CLOUD_KEY_CAPABILITY[key];
+    const cloudOk = cloudActive && capability !== undefined && cloudCaps.includes(capability);
+    button.classList.toggle("cloud-off", !local && !cloudOk);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -236,6 +312,60 @@ async function sendKey(key: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Modo nuvem (SmartThings)
+// ---------------------------------------------------------------------------
+
+function applyStStatus(status: StStatus) {
+  stSetup.classList.toggle("hidden", status.hasToken);
+  stPanel.classList.toggle("hidden", !status.hasToken);
+  stRemove.classList.toggle("hidden", !status.hasToken);
+
+  if (status.hasToken && status.deviceId) {
+    cloudActive = true;
+    cloudCaps = status.capabilities;
+    stStatusText.textContent = `Nuvem ativa: ${status.deviceLabel ?? "TV"} • ${status.capabilities.length} capacidades.`;
+  } else {
+    cloudActive = false;
+    cloudCaps = [];
+    stStatusText.textContent = status.hasToken
+      ? "Token salvo. Escolha a TV abaixo e clique em “Usar esta TV”."
+      : "";
+  }
+  refreshRemoteAvailability();
+}
+
+function fillStDevices(list: StDevice[]) {
+  stDeviceSelect.innerHTML = list
+    .map(
+      (d) =>
+        `<option value="${esc(d.deviceId)}">${esc(d.label)}${d.deviceType ? ` — ${esc(d.deviceType)}` : ""}</option>`,
+    )
+    .join("");
+}
+
+async function stExecute(action: string, arg?: string) {
+  try {
+    await invoke("st_execute", { action, arg: arg ?? null });
+  } catch (error) {
+    toast(String(error), "error");
+  }
+}
+
+function launchAppById(appId: string, appType?: number | null) {
+  if (sessionIp) {
+    return invoke("launch_app", { appId, appType: appType ?? null })
+      .then(() => toast("App iniciado na TV.", "success"))
+      .catch((error) => toast(String(error), "error"));
+  }
+  if (cloudActive) {
+    void stExecute("launch_app", appId);
+    return Promise.resolve();
+  }
+  toast("Conecte primeiro uma TV (local ou nuvem).", "info");
+  return Promise.resolve();
+}
+
+// ---------------------------------------------------------------------------
 // Apps
 // ---------------------------------------------------------------------------
 
@@ -274,6 +404,12 @@ async function loadApps() {
   }
 }
 
+function loadPresetApps() {
+  renderApps(APP_PRESETS);
+  appCustomForm.classList.remove("hidden");
+  toast("No modo nuvem exibimos atalhos comuns. Use o campo de ID para abrir outros apps.", "info");
+}
+
 // ---------------------------------------------------------------------------
 // Eventos
 // ---------------------------------------------------------------------------
@@ -310,7 +446,7 @@ deviceList.addEventListener("click", (event) => {
 
 remoteBody.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button.key");
-  if (!button || !sessionIp) return;
+  if (!button) return;
 
   if (button.id === "numpad-toggle") {
     numpad.classList.toggle("hidden");
@@ -322,7 +458,20 @@ remoteBody.addEventListener("click", (event) => {
 
   button.classList.add("pressed");
   setTimeout(() => button.classList.remove("pressed"), 120);
-  void sendKey(key);
+
+  if (sessionIp) {
+    void sendKey(key);
+    return;
+  }
+
+  if (cloudActive) {
+    const action = CLOUD_KEY_ACTIONS[key];
+    if (!action) {
+      toast("Tecla indisponível no modo nuvem (SmartThings).", "info");
+      return;
+    }
+    void stExecute(action);
+  }
 });
 
 numpadToggle.addEventListener("click", () => numpad.classList.toggle("hidden"));
@@ -332,12 +481,71 @@ appGrid.addEventListener("click", (event) => {
   const appId = tile?.dataset.appId;
   if (!appId) return;
   const appType = tile?.dataset.appType ? Number(tile.dataset.appType) : null;
-  void invoke("launch_app", { appId, appType })
-    .then(() => toast("App iniciado na TV.", "success"))
-    .catch((error) => toast(String(error), "error"));
+  void launchAppById(appId, appType);
 });
 
-appsRefresh.addEventListener("click", () => void loadApps());
+appCustomForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const appId = appCustomId.value.trim();
+  if (!appId) return;
+  void launchAppById(appId);
+  appCustomId.value = "";
+});
+
+stForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const token = stTokenInput.value.trim();
+  if (!token) return;
+  try {
+    const list = await invoke<StDevice[]>("st_set_token", { token });
+    stTokenInput.value = "";
+    fillStDevices(list);
+    toast(`Token salvo. ${list.length} dispositivo(s) encontrado(s).`, "success");
+
+    let status = await invoke<StStatus>("st_status");
+    if (list.length === 1) {
+      status = await invoke<StStatus>("st_select_device", { deviceId: list[0].deviceId });
+    }
+    applyStStatus(status);
+  } catch (error) {
+    toast(String(error), "error");
+  }
+});
+
+stUse.addEventListener("click", async () => {
+  const deviceId = stDeviceSelect.value;
+  if (!deviceId) {
+    toast("Escolha uma TV na lista.", "info");
+    return;
+  }
+  try {
+    const status = await invoke<StStatus>("st_select_device", { deviceId });
+    applyStStatus(status);
+    toast("Modo nuvem ativo — as teclas suportadas já funcionam.", "success");
+  } catch (error) {
+    toast(String(error), "error");
+  }
+});
+
+stRemove.addEventListener("click", async () => {
+  try {
+    await invoke("st_clear");
+    applyStStatus(await invoke<StStatus>("st_status"));
+    toast("Token do SmartThings removido.", "info");
+  } catch (error) {
+    toast(String(error), "error");
+  }
+});
+
+appsRefresh.addEventListener("click", () => {
+  if (sessionIp) {
+    void loadApps();
+    return;
+  }
+  if (cloudActive) {
+    loadPresetApps();
+  }
+});
 
 disconnectBtn.addEventListener("click", () => {
   void invoke("disconnect_tv").catch((error) => toast(String(error), "error"));
@@ -386,7 +594,7 @@ textForm.addEventListener("submit", async (event) => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (!sessionIp) return;
+  if (!sessionIp && !cloudActive) return;
   const target = event.target as HTMLElement | null;
   if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
 
@@ -413,7 +621,17 @@ window.addEventListener("keydown", (event) => {
   const button = remoteBody.querySelector<HTMLButtonElement>(`[data-key="${key}"]`);
   button?.classList.add("pressed");
   setTimeout(() => button?.classList.remove("pressed"), 120);
-  void sendKey(key);
+
+  if (sessionIp) {
+    void sendKey(key);
+    return;
+  }
+  const cloudAction = CLOUD_KEY_ACTIONS[key];
+  if (cloudAction) {
+    void stExecute(cloudAction);
+  } else {
+    toast("Tecla indisponível no modo nuvem (SmartThings).", "info");
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -422,12 +640,32 @@ window.addEventListener("keydown", (event) => {
 
 async function init() {
   renderDevices();
+
   try {
     const saved = await invoke<TvDevice[]>("list_saved_devices");
     saved.forEach((device) => devices.set(device.ip, { ...device, reachable: false }));
     renderDevices();
   } catch (error) {
     toast(String(error), "error");
+  }
+
+  try {
+    const status = await invoke<StStatus>("st_status");
+    applyStStatus(status);
+    if (status.hasToken) {
+      try {
+        fillStDevices(await invoke<StDevice[]>("st_list_devices"));
+      } catch (error) {
+        toast(String(error), "error");
+      }
+    }
+  } catch (error) {
+    toast(String(error), "error");
+  }
+
+  // enquanto nada estiver disponível, garante o estado "desligado"
+  if (sessionIp === null && !cloudActive) {
+    refreshRemoteAvailability();
   }
 }
 

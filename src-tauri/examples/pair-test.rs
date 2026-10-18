@@ -40,11 +40,41 @@ async fn main() {
     let client_name = std::env::args()
         .nth(2)
         .unwrap_or_else(|| "Controle Tauri".to_string());
+    let use_tls = std::env::args().nth(3).as_deref() == Some("tls");
+    let source_ip = std::env::args().nth(4);
     let name = base64::engine::general_purpose::STANDARD.encode(&client_name);
-    let url = format!("ws://{ip}:8001/api/v2/channels/samsung.remote.control?name={name}");
+    let (scheme, port) = if use_tls { ("wss", 8002) } else { ("ws", 8001) };
+    let url = format!("{scheme}://{ip}:{port}/api/v2/channels/samsung.remote.control?name={name}");
     println!("Conectando em {url} (nome: {client_name})");
 
-    let (mut ws, _) = match tokio_tungstenite::connect_async(&url).await {
+    let (mut ws, _) = match if let Some(source) = &source_ip {
+        // força a origem (útil para testar se a TV bloqueou o IP do PC)
+        let local: std::net::SocketAddr = format!("{source}:0").parse().expect("IP de origem inválido");
+        let remote: std::net::SocketAddr = format!("{ip}:{port}").parse().expect("destino inválido");
+        let socket = tokio::net::TcpSocket::new_v4().expect("falha ao criar socket");
+        socket.bind(local).expect("falha ao fixar IP de origem");
+        let stream = socket.connect(remote).await.expect("falha ao conectar");
+        println!("Origem fixada em {source}");
+        tokio_tungstenite::client_async(
+            &url,
+            tokio_tungstenite::MaybeTlsStream::Plain(stream),
+        )
+        .await
+    } else if use_tls {
+        let connector = native_tls::TlsConnector::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .expect("falha ao criar conector TLS");
+        tokio_tungstenite::connect_async_tls_with_config(
+            &url,
+            None,
+            false,
+            Some(tokio_tungstenite::Connector::NativeTls(connector)),
+        )
+        .await
+    } else {
+        tokio_tungstenite::connect_async(&url).await
+    } {
         Ok(pair) => pair,
         Err(err) => {
             println!("FALHA ao conectar: {err}");
