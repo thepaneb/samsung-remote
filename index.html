@@ -15,12 +15,12 @@
           <span class="brand-badge">TV</span>
           <div>
             <h1>Controle Remoto Samsung</h1>
-            <p class="brand-sub" id="connected-name">Nenhuma TV conectada</p>
+            <p class="brand-sub" id="connected-name">Modo nuvem (SmartThings)</p>
           </div>
         </div>
         <div class="status-pill" id="status-pill" data-state="idle">
           <span class="dot"></span>
-          <span id="status-text">Desconectado</span>
+          <span id="status-text">Não configurado</span>
         </div>
       </header>
 
@@ -28,43 +28,7 @@
         <aside class="col-left">
           <section class="card">
             <div class="card-head">
-              <h2>TVs na rede</h2>
-              <button class="btn primary" id="discover-btn">Buscar TVs</button>
-            </div>
-
-            <form class="inline-form" id="ip-form">
-              <input
-                type="text"
-                id="ip-input"
-                placeholder="Adicionar por IP — ex.: 192.168.0.10"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button class="btn" type="submit">Adicionar</button>
-            </form>
-
-            <ul class="device-list" id="device-list"></ul>
-            <p class="empty" id="device-empty">
-              Nenhuma TV encontrada ainda. Clique em “Buscar TVs” ou adicione pelo IP.
-            </p>
-          </section>
-
-          <section class="card">
-            <div class="card-head">
-              <h2>Apps da TV</h2>
-              <button class="btn" id="apps-refresh" disabled>Carregar</button>
-            </div>
-            <div class="app-grid" id="app-grid"></div>
-            <p class="empty" id="apps-empty">Conecte-se a uma TV para carregar os aplicativos.</p>
-            <form class="inline-form hidden" id="app-custom-form">
-              <input id="app-custom-id" placeholder="ID do app (ex.: 3201512006785)" autocomplete="off" spellcheck="false" />
-              <button class="btn" type="submit">Abrir</button>
-            </form>
-          </section>
-
-          <section class="card">
-            <div class="card-head">
-              <h2>Modo nuvem (SmartThings)</h2>
+              <h2>SmartThings</h2>
               <button class="btn ghost hidden" id="st-remove">Remover token</button>
             </div>
 
@@ -77,41 +41,40 @@
                   autocomplete="off"
                   spellcheck="false"
                 />
-                <button class="btn" type="submit">Salvar</button>
+                <button class="btn primary" type="submit">Salvar</button>
               </form>
               <p class="hint">
-                Alternativa quando a TV recusa o controle local: crie um token em
-                <b>account.smartthings.com/tokens</b> (escopos <code>r:devices:*</code> e
-                <code>x:devices:*</code>), com a TV já adicionada no app SmartThings.
+                O controle é feito pela nuvem do SmartThings. Crie um token em
+                <b>account.smartthings.com/tokens</b> com os escopos <code>r:devices:*</code> e
+                <code>x:devices:*</code>, com a TV já adicionada no app SmartThings do celular.
               </p>
             </div>
 
             <div id="st-panel" class="hidden">
               <div class="inline-form">
                 <select id="st-device"></select>
-                <button class="btn" id="st-use">Usar esta TV</button>
+                <button class="btn primary" id="st-use">Usar esta TV</button>
               </div>
               <p class="hint" id="st-status-text">—</p>
             </div>
           </section>
-        </aside>
 
           <section class="card">
             <div class="card-head">
-              <h2>Enviar texto</h2>
+              <h2>Atalhos de apps</h2>
             </div>
-            <form class="inline-form" id="text-form">
+            <div class="app-grid" id="app-grid"></div>
+            <form class="inline-form" id="app-custom-form">
               <input
-                type="text"
-                id="text-input"
-                placeholder="Digite aqui…"
+                id="app-custom-id"
+                placeholder="ID do app (ex.: 11101200001)"
                 autocomplete="off"
-                disabled
+                spellcheck="false"
               />
-              <button class="btn" type="submit" id="text-send" disabled>Enviar</button>
+              <button class="btn" type="submit">Abrir</button>
             </form>
             <p class="hint">
-              Digita no campo que estiver em foco na TV (ex.: busca do YouTube ou Netflix).
+              Os IDs variam por região/ano da TV. Se algum abrir o app errado, tente outro ID.
             </p>
           </section>
         </aside>
@@ -121,15 +84,16 @@
             <div class="remote-top">
               <div>
                 <h2 id="remote-title">Controle</h2>
-                <p class="hint" id="remote-hint">Conecte-se a uma TV para usar o controle.</p>
+                <p class="hint" id="remote-hint">
+                  Conecte sua conta SmartThings para controlar a TV.
+                </p>
               </div>
-              <button class="btn" id="disconnect-btn" disabled>Desconectar</button>
             </div>
 
             <div class="remote-body disabled" id="remote-body">
               <div class="row row-top">
                 <button class="key round power" data-key="KEY_POWER" title="Ligar/desligar">⏻</button>
-                <button class="key round" data-key="KEY_SOURCE" title="Fonte (HDMI)">
+                <button class="key round" data-key="KEY_SOURCE" title="Trocar entrada">
                   <span class="glyph">⧉</span><span class="mini">Fonte</span>
                 </button>
                 <button class="key round" data-key="KEY_HOME" title="Início">
@@ -166,12 +130,6 @@
                 <button class="key pill" data-key="KEY_RETURN">
                   <span class="glyph">↩</span><span class="mini">Voltar</span>
                 </button>
-                <button class="key pill" data-key="KEY_GUIDE">
-                  <span class="glyph">▤</span><span class="mini">Guia</span>
-                </button>
-                <button class="key pill" data-key="KEY_INFO">
-                  <span class="glyph">ⓘ</span><span class="mini">Info</span>
-                </button>
                 <button class="key pill" data-key="KEY_MENU">
                   <span class="glyph">☰</span><span class="mini">Menu</span>
                 </button>
@@ -190,45 +148,26 @@
                 <button class="key pill" data-key="KEY_FF" title="Avançar">
                   <span class="glyph">⏩</span>
                 </button>
-                <button class="key pill" data-key="KEY_TOOLS">
-                  <span class="glyph">⚙</span><span class="mini">Ferramentas</span>
-                </button>
-                <button class="key pill" data-key="KEY_CH_LIST">
-                  <span class="glyph">☷</span><span class="mini">Canais</span>
-                </button>
-              </div>
-
-              <div class="row row-bottom">
-                <button class="key dot red" data-key="KEY_RED" title="Vermelho"></button>
-                <button class="key dot green" data-key="KEY_GREEN" title="Verde"></button>
-                <button class="key dot yellow" data-key="KEY_YELLOW" title="Amarelo"></button>
-                <button class="key dot blue" data-key="KEY_BLUE" title="Azul"></button>
-                <button class="key pill small" id="numpad-toggle" title="Teclado numérico">123</button>
-              </div>
-
-              <div class="numpad hidden" id="numpad">
-                <button class="key num" data-key="KEY_1">1</button>
-                <button class="key num" data-key="KEY_2">2</button>
-                <button class="key num" data-key="KEY_3">3</button>
-                <button class="key num" data-key="KEY_4">4</button>
-                <button class="key num" data-key="KEY_5">5</button>
-                <button class="key num" data-key="KEY_6">6</button>
-                <button class="key num" data-key="KEY_7">7</button>
-                <button class="key num" data-key="KEY_8">8</button>
-                <button class="key num" data-key="KEY_9">9</button>
-                <button class="key num" data-key="KEY_PRECH">PRÉ</button>
-                <button class="key num" data-key="KEY_0">0</button>
-                <button class="key num" data-key="KEY_PLUS100">+100</button>
               </div>
             </div>
 
             <p class="hint shortcuts">
               Atalhos do teclado: setas = navegar • Enter = OK • Backspace = voltar • +/− volume •
-              M = mudo • Espaço = play/pause
+              M = mudo • Espaço = play/pause • H = início
             </p>
           </div>
         </section>
       </main>
+    </div>
+
+    <div class="input-overlay hidden" id="input-overlay">
+      <div class="input-menu card">
+        <div class="card-head">
+          <h2>Escolher entrada</h2>
+          <button class="btn ghost" id="input-close">✕</button>
+        </div>
+        <div class="input-list" id="input-list"></div>
+      </div>
     </div>
 
     <div class="toast-stack" id="toast-stack"></div>

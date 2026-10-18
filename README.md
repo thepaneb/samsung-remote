@@ -1,29 +1,39 @@
-# Controle Remoto Samsung (Tauri)
+# Controle Remoto Samsung 🎮📺
 
-Aplicativo desktop para controlar **TVs Samsung (Tizen, 2016+)** pela rede local.
-Feito com **Tauri 2** (Rust no backend, TypeScript no frontend).
+Aplicativo desktop (**Tauri 2 + Rust + TypeScript**) para controlar TVs Samsung pela
+**nuvem do SmartThings** — funciona mesmo quando a TV recusa o pareamento de controle
+local (WebSocket).
 
 ![status](https://img.shields.io/badge/Tauri-2-24C8DB) ![status](https://img.shields.io/badge/Rust-stable-orange) ![status](https://img.shields.io/badge/TypeScript-5+-3178C6)
 
 ## Funcionalidades
 
-- 🔍 **Descoberta automática** de TVs na rede (SSDP) e adição manual por IP
-- 🤝 **Pareamento com token** — aceite uma vez na TV e a conexão passa a ser direta
-- 🕹️ **Controle completo**: power, volume, canal, D-pad, Home, Voltar, Menu, Guia, Info, Ferramentas, mídia (⏪ ⏯ ⏩), teclas coloridas e teclado numérico (inclui PRÉ e +100)
-- ⌨️ **Envio de texto** para o campo aberto na TV (busca do YouTube/Netflix etc.)
-- 📺 **Lista de apps** da TV com ícones, para abrir com um clique
-- ⏻ **Wake-on-LAN** para ligar a TV desligada pelo MAC
-- ☁️ **Modo nuvem (SmartThings)** como alternativa quando a TV recusa o pareamento local
-- ⌨️ **Atalhos de teclado**: setas, Enter, Backspace, `+`/`−`, `M`, `Espaço`, `P`, `H`
+- ⏻ **Power** (ligar/desligar), volume e mudo
+- 🕹️ **D-pad completo** (setas + OK), Voltar, Menu, Home e Sair
+- 📺 **Seletor de entradas** — troca direta para TV, HDMI1, HDMI2… com os nomes que você configurou
+- 📡 **Canal +/−** e **play/pause**, retroceder e avançar
+- 🚀 **Atalhos de apps** (Netflix, YouTube, Prime Video, Disney+, Globoplay, Max, Spotify, Internet)
+  + campo para abrir qualquer app por ID
+- ⌨️ **Atalhos de teclado**: setas = navegar • Enter = OK • Backspace = voltar • `+`/`−` volume •
+  `M` mudo • `Espaço`/`P` play-pause • `H` início
+- 🔒 Token salvo localmente (você pode removê-lo a qualquer momento no próprio app)
 
 ## Requisitos
 
 - Windows 10/11 (WebView2 já vem no Windows 11), macOS ou Linux
-- [Node.js](https://nodejs.org) 18+
-- [Rust](https://rustup.rs) (canal stable)
+- [Node.js](https://nodejs.org) 18+ e [Rust](https://rustup.rs) (stable) para compilar
 - Windows: Build Tools do Visual Studio (C++)
 
-## Executar em modo de desenvolvimento
+## Como usar
+
+1. **Adicione a TV no app SmartThings do celular** (conta Samsung) — se ela já aparece lá, pronto.
+2. Crie um **token pessoal** em <https://account.smartthings.com/tokens>:
+   - Nome: `Controle Tauri`
+   - Permissões: **Devices** → leitura (**`r:devices:*`**) e execução (**`x:devices:*`**)
+3. Abra o app, cole o token no cartão **SmartThings** e clique em **Salvar**.
+4. Escolha sua TV na lista e clique em **“Usar esta TV”** — o controle está pronto.
+
+## Executar em desenvolvimento
 
 ```bash
 npm install
@@ -38,80 +48,54 @@ npm run tauri build
 
 Os artefatos ficam em `src-tauri/target/release/bundle` (`.msi`/`.exe` no Windows).
 
-## Como usar
+## Como funciona
 
-1. Ligue a TV e deixe-a na **mesma rede** do computador.
-2. Abra o app e clique em **“Buscar TVs”** (ou digite o IP e clique em “Adicionar”).
-3. Clique em **“Conectar”** na TV encontrada.
-4. Na TV aparece um aviso do tipo *“Permitir que ‘Controle Tauri’ se conecte?”* —
-   aceite com o **controle físico**. O token fica salvo e as próximas conexões são automáticas.
+O app usa a **API pública do SmartThings** (`https://api.smartthings.com/v1`) com seu token pessoal:
 
-### Ligar a TV desligada (Wake-on-LAN)
+| Ação | Capacidade / comando |
+| --- | --- |
+| Ligar/desligar | `switch` (`on`/`off`, alternando pelo estado) |
+| Volume | `audioVolume` (`volumeUp`/`volumeDown`) |
+| Mudo | `samsungvd.remoteControl.send MUTE` (ou `audioMute`) |
+| D-pad, OK, Voltar, Menu, Home, Sair | `samsungvd.remoteControl.send UP/DOWN/LEFT/RIGHT/OK/BACK/MENU/HOME/EXIT` |
+| Fonte | `samsungvd.mediaInputSource.setInputSource` (lista com os nomes das entradas) |
+| Canal | `tvChannel` (`channelUp`/`channelDown`) |
+| Play/Pause, ⏪, ⏩ | `samsungvd.remoteControl.send PLAY_BACK/REWIND/FF` (ou `mediaPlayback`) |
+| Abrir app | `custom.launchapp.launchApp` com o appId |
 
-- A TV precisa já ter sido pareada uma vez (para guardarmos o **MAC**).
-- Na TV: **Configurações → Geral → Rede → Configurações avançadas → “Ligar com celular” (Power On with Mobile)** = ativado. O nome varia conforme o modelo/ano.
-- Funciona de forma mais confiável com **cabo de rede**; via Wi-Fi depende do modelo.
-- No app, clique no botão **⏻** ao lado da TV na lista.
-
-### Modo nuvem (plano B, SmartThings)
-
-Se a TV **recusar o pareamento local** (ver solução de problemas abaixo), o app oferece um
-modo alternativo de controle pela **nuvem do SmartThings**:
-
-1. Adicione a TV no app **SmartThings** do celular (sua conta Samsung) — se ela já aparece lá, pronto.
-2. Crie um **token pessoal** em <https://account.smartthings.com/tokens>:
-   - Nome: `Controle Tauri`
-   - Escopos: **`r:devices:*`** e **`x:devices:*`** (e `r:locations:*` se aparecer)
-3. No app (Tauri), cole o token no cartão **“Modo nuvem (SmartThings)”** e clique em **Salvar**.
-4. Escolha sua TV na lista e clique em **“Usar esta TV”**.
-
-Teclas disponíveis no modo nuvem (dependem das capacidades que a TV expõe no SmartThings):
-**power, volume, mudo, canal, play/pause, rewind, avançar, trocar de entrada** (direto para a
-entrada escolhida, com os nomes configurados nos HDMI), **abrir apps** e, quando a TV expõe a
-capacidade `samsungvd.remoteControl`: **D-pad completo, OK, Voltar, Menu, Home e Sair**.
-Números, teclas coloridas, Guia/Info/Ferramentas e envio de texto existem apenas no modo local.
-
-> Os **IDs de apps** variam por região/ano da TV. Se algum atalho abrir o app errado, use o campo
-> de **ID personalizado** com o código correto para o seu modelo (veja a lista da comunidade em
-> `APPLICATIONS.md` do projeto samsung-tv-ws-api).
+As teclas são habilitadas automaticamente conforme as **capacidades que a sua TV expõe** —
+teclas não suportadas aparecem apagadas. O mapeamento de cada capacidade para o componente do
+dispositivo é descoberto ao selecionar a TV e salvo em `smartthings.json` (pasta de dados do app).
 
 ## Solução de problemas
 
 | Problema | O que fazer |
 | --- | --- |
-| Nenhuma TV encontrada | Confirme que a TV está ligada e na mesma rede; adicione pelo IP manualmente (TV: Configurações → Geral → Rede → Status da rede). |
-| “A TV recusou a conexão” | Clique em **✕ (Esquecer)** e conecte de novo para gerar um novo pedido de permissão na TV. |
-| TV recusa na hora (`ms.channel.unauthorized`), sem popup, mesmo com a lista de dispositivos vazia | Estado travado do serviço de conexão. Na TV: desative **Modo Inicial Rápido/Instant On**, **tire da tomada por 1 minuto** (standby não reinicia o serviço de rede) e tente de novo. Se persistir: **Configurações → Suporte → Autodiagnóstico → Redefinir Smart Hub** (PIN 0000) + aceitar novamente os termos, e em último caso **Atualizar software**. |
-| Firewall | Libere as portas **8000/8001/8002** da TV e UDP **1900** (SSDP) no Windows. |
-| Texto não é digitado | O campo de texto precisa estar aberto/focado na TV; alguns apps bloqueiam entrada externa. |
-| Teclas coloridas/PRÉ/+100 sem efeito | Isso varia entre modelos — é a TV que decide interpretar cada código. |
-
-## Como funciona (protocolo)
-
-- **Descoberta:** SSDP `M-SEARCH` em `239.255.255.250:1900`, alvo `urn:samsung.com:device:RemoteControlReceiver:1`.
-- **Informações:** `GET http://IP:8001/api/v2/` (nome, modelo, MAC, `PowerState`), com fallback para `:8000` e `https://:8002` em modelos mais antigos/novos.
-- **Controle:** WebSocket `ws://IP:8001/api/v2/channels/samsung.remote.control?name=<base64>`, com fallback para `wss://IP:8002` (certificado autoassinado).
-- **Teclas:** `{"method":"ms.remote.control","params":{"Cmd":"Click","DataOfCmd":"KEY_...","TypeOfRemote":"SendRemoteKey"}}`.
-- **Texto:** `SendInputString` (com o broadcast `custom.remote.textReceived` antes, exigido por alguns modelos).
-- **Apps:** pedido pelo canal WebSocket (`ms.channel.emit` → `ed.installedApp.get`) e fallback REST `GET /api/v2/applications?token=...`; lançamento via `ed.apps.launch`.
-- **Pareamento:** a TV devolve o token em `ms.channel.connect`; ele é salvo em `devices.json` na pasta de dados do app.
+| “Token inválido ou sem permissão” | Gere novo token marcando **Devices** com leitura **e** execução (`r:devices:*`, `x:devices:*`). |
+| TV não aparece na lista | Confirme que ela está adicionada no app SmartThings. A lista mostra primeiro os dispositivos com cara de TV; se nada bater, mostra todos. |
+| Atalho abre o app errado | IDs variam por região/ano — use o campo de ID personalizado com o código correto do seu modelo. |
+| Tecla apagada | A TV não expõe a capacidade correspondente no SmartThings; não há como enviar essa tecla pela nuvem. |
+| Comando não faz efeito | Verifique se a TV está ligada e conectada à internet (o caminho é pela nuvem do SmartThings). |
 
 ## Estrutura do projeto
 
 ```
 src-tauri/src/
-├── lib.rs        # bootstrap do Tauri e registro dos comandos
-├── ssdp.rs       # descoberta de TVs (UDP multicast)
-├── device.rs     # informações da TV via HTTP
-├── tv.rs         # WebSocket: handshake, teclas, texto, loop da sessão
-├── wol.rs        # Wake-on-LAN (magic packet)
-├── store.rs      # persistência de TVs/tokens (devices.json)
-└── commands.rs   # comandos expostos ao frontend
+├── lib.rs         # bootstrap do Tauri e registro dos comandos
+├── smartthings.rs # cliente da API SmartThings (auth, comandos, entradas)
+└── commands.rs    # comandos expostos ao frontend
 src/
-├── main.ts       # lógica da interface
-└── styles.css    # visual
-index.html        # layout do controle
+├── main.ts        # lógica da interface
+└── styles.css     # visual
+index.html         # layout do controle
 ```
+
+## Nota histórica
+
+A primeira versão deste projeto controlava a TV **localmente** (descoberta SSDP, WebSocket na
+porta 8001/8002, Wake-on-LAN), mas a TV de testes passou a **recusar todo pareamento local**
+(estado travado do serviço da TV). O projeto foi então reescrito com escopo reduzido para o
+**modo nuvem**, que funciona de forma confiável. O código local continua no histórico do Git.
 
 ## Aviso
 

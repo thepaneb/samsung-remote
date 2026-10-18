@@ -1,9 +1,10 @@
-//! Plano B: controle pela nuvem via SmartThings API.
+//! Controle de TVs Samsung via SmartThings Cloud.
 //!
-//! Útil quando a TV recusa o pareamento local (WebSocket). O usuário cria um
-//! token pessoal em <https://account.smartthings.com/tokens> com os escopos
-//! `r:devices:*` e `x:devices:*`, adiciona a TV no app SmartThings e conecta
-//! aqui. O controle passa a ser feito pelos comandos padrão de capacidade.
+//! O usuário cria um token pessoal em <https://account.smartthings.com/tokens>
+//! (escopos `r:devices:*` e `x:devices:*`), adiciona a TV no app SmartThings e
+//! conecta aqui. O controle usa os comandos de capacidade do dispositivo,
+//! incluindo as capacidades Samsung (`samsungvd.remoteControl` para teclas de
+//! navegação e `samsungvd.mediaInputSource` para troca direta de entrada).
 
 use std::path::PathBuf;
 use std::time::Duration;
@@ -30,12 +31,6 @@ pub struct StConfig {
     /// capacidade → componente que a expõe (ex.: "switch" → "main")
     #[serde(default)]
     pub cap_components: std::collections::HashMap<String, String>,
-    /// estado local do mudo (a leitura pela nuvem é inconsistente em TVs 2019)
-    #[serde(default)]
-    pub muted: Option<bool>,
-    /// estado local de reprodução
-    #[serde(default)]
-    pub playing: Option<bool>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -55,6 +50,18 @@ pub struct StStatus {
     pub device_label: Option<String>,
     pub capabilities: Vec<String>,
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct StInput {
+    pub id: String,
+    pub name: String,
+    pub current: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Persistência
+// ---------------------------------------------------------------------------
 
 fn client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
@@ -99,8 +106,32 @@ pub fn status(app: &AppHandle) -> StStatus {
 }
 
 // ---------------------------------------------------------------------------
-// Chamadas à API
+// Utilitários internos
 // ---------------------------------------------------------------------------
+
+fn has_cap(cfg: &StConfig, cap: &str) -> bool {
+    cfg.capabilities.iter().any(|c| c == cap)
+}
+
+fn component_for(cfg: &StConfig, cap: &str) -> String {
+    cfg.cap_components
+        .get(cap)
+        .cloned()
+        .or_else(|| cfg.components.first().cloned())
+        .unwrap_or_else(|| "main".to_string())
+}
+
+fn require_token_device(cfg: &StConfig) -> Result<(String, String), String> {
+    let token = cfg
+        .token
+        .clone()
+        .ok_or("Modo nuvem sem token configurado")?;
+    let device_id = cfg
+        .device_id
+        .clone()
+        .ok_or("Nenhuma TV selecionada no modo nuvem")?;
+    Ok((token, device_id))
+}
 
 fn capabilities_of(components: Option<&Vec<Value>>) -> Vec<String> {
     let mut caps: Vec<String> = Vec::new();
@@ -119,6 +150,10 @@ fn capabilities_of(components: Option<&Vec<Value>>) -> Vec<String> {
     }
     caps
 }
+
+// ---------------------------------------------------------------------------
+// Chamadas à API
+// ---------------------------------------------------------------------------
 
 pub async fn list_devices(token: &str) -> Result<Vec<StDevice>, String> {
     let response = client()?
@@ -168,10 +203,14 @@ pub async fn list_devices(token: &str) -> Result<Vec<StDevice>, String> {
         .filter(|d| !d.device_id.is_empty())
         .collect();
 
-    // Preferir TVs: quem tem capacidade de canal ou mídia (se nada bater,
-    // devolve tudo para o usuário escolher).
+    // Preferir TVs: quem tem capacidade de canal, mídia ou de TV Samsung.
     let is_tv = |d: &StDevice| {
-        d.capabilities.iter().any(|c| c == "tvChannel" || c == "mediaPlayback")
+        d.capabilities.iter().any(|c| {
+            c == "tvChannel"
+                || c == "mediaPlayback"
+                || c == "samsungvd.remoteControl"
+                || c == "samsungvd.mediaInputSource"
+        })
     };
     if devices.iter().any(is_tv) {
         devices.retain(is_tv);
@@ -323,11 +362,106 @@ pub async fn send_command(
 }
 
 // ---------------------------------------------------------------------------
-// Execução de ações (mapeamento tecla → capacidade)
+// Entradas da TV
 // ---------------------------------------------------------------------------
 
-/// Envia uma tecla pelo canal de controle remoto do SmartThings
-/// (`samsungvd.remoteControl.send`), que aceita o conjunto abaixo.
+pub async fn list_inputs(app: &AppHandle) -> Result<Vec<StInput>, String> {
+    let cfg = load(app);
+    let (token, device_id) = require_token_device(&cfg)?;
+
+    // Variante Samsung: traz a lista real de entradas (com o nome configurado
+    // em cada HDMI).
+    if has_cap(&cfg, "samsungvd.mediaInputSource") {
+        let component = component_for(&cfg, "samsungvd.mediaInputSource");
+        let raw = get_status_raw(
+            &token,
+            &device_id,
+            &component,
+            "samsungvd.mediaInputSource",
+            "supportedInputSourcesMap",
+        )
+        .await?;
+        let current = get_status(
+            &token,
+            &device_id,
+            &component,
+            "samsungvd.mediaInputSource",
+            "inputSource",
+        )
+        .await?;
+
+        let inputs: Vec<StInput> = raw
+            .and_then(|v| serde_json::from_value::<Vec<Value>>(v).ok())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        let id = item.get("id").and_then(|v| v.as_str())?.to_string();
+                        let name = item
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(id.as_str())
+                            .to_string();
+                        let current = current.as_deref() == Some(id.as_str());
+                        Some(StInput { id, name, current })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        if !inputs.is_empty() {
+            return Ok(inputs);
+        }
+    }
+
+    // Fallback: capacidade padrão.
+    if has_cap(&cfg, "mediaInputSource") {
+        let component = component_for(&cfg, "mediaInputSource");
+        let supported = get_status(
+            &token,
+            &device_id,
+            &component,
+            "mediaInputSource",
+            "supportedInputSources",
+        )
+        .await?;
+        let current = get_status(
+            &token,
+            &device_id,
+            &component,
+            "mediaInputSource",
+            "inputSource",
+        )
+        .await?;
+
+        let inputs: Vec<StInput> = supported
+            .as_deref()
+            .map(|s| {
+                s.split(',')
+                    .map(|x| x.trim().trim_matches('"').trim_matches('[').trim_matches(']'))
+                    .filter(|x| !x.is_empty())
+                    .map(|id| StInput {
+                        id: id.to_string(),
+                        name: id.to_string(),
+                        current: current.as_deref() == Some(id),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        if !inputs.is_empty() {
+            return Ok(inputs);
+        }
+    }
+
+    Err("A TV não informou as entradas disponíveis.".into())
+}
+
+// ---------------------------------------------------------------------------
+// Execução de ações (tecla → capacidade)
+// ---------------------------------------------------------------------------
+
+/// Teclas aceitas por `samsungvd.remoteControl.send`.
 const REMOTE_KEYS: [&str; 17] = [
     "UP", "DOWN", "LEFT", "RIGHT", "OK", "BACK", "EXIT", "MENU", "HOME", "MUTE", "PLAY", "PAUSE",
     "STOP", "REWIND", "FF", "PLAY_BACK", "SOURCE",
@@ -349,33 +483,11 @@ fn remote_key_attempt(key: &str) -> Result<(&'static str, String, Vec<Value>), S
 
 pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Result<(), String> {
     let cfg = load(app);
-    let token = cfg
-        .token
-        .clone()
-        .ok_or("Modo nuvem sem token configurado")?;
-    let device_id = cfg
-        .device_id
-        .clone()
-        .ok_or("Nenhuma TV selecionada no modo nuvem")?;
+    let (token, device_id) = require_token_device(&cfg)?;
 
-    let has = |cap: &str| cfg.capabilities.iter().any(|c| c == cap);
-    let component_for = |cap: &str| {
-        cfg.cap_components
-            .get(cap)
-            .cloned()
-            .or_else(|| cfg.components.first().cloned())
-            .unwrap_or_else(|| "main".to_string())
-    };
-
-    // Estado previsto após o comando (a leitura de status pela nuvem é
-    // inconsistente em TVs 2019; mantemos o estado local como reforço).
-    let mut new_muted: Option<bool> = None;
-    let mut new_playing: Option<bool> = None;
-
-    // Resolve a capacidade, o comando e os argumentos de cada ação.
     let (capability, command, arguments): (&str, String, Vec<Value>) = match action {
         "power_on" | "power_off" => {
-            if !has("switch") {
+            if !has_cap(&cfg, "switch") {
                 return Err("A TV não expõe controle de energia no SmartThings.".into());
             }
             let cmd = if action == "power_on" { "on" } else { "off" };
@@ -383,37 +495,34 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
         }
 
         "power_toggle" => {
-            if !has("switch") {
+            if !has_cap(&cfg, "switch") {
                 return Err("A TV não expõe controle de energia no SmartThings.".into());
             }
-            let component = component_for("switch");
+            let component = component_for(&cfg, "switch");
             let state = get_status(&token, &device_id, &component, "switch", "switch").await?;
             let cmd = if state.as_deref() == Some("on") { "off" } else { "on" };
             ("switch", cmd.to_string(), vec![])
         }
 
         "volume_up" | "volume_down" => {
-            if !has("audioVolume") {
+            if !has_cap(&cfg, "audioVolume") {
                 return Err("Volume não disponível no modo nuvem para esta TV.".into());
             }
             let cmd = if action == "volume_up" { "volumeUp" } else { "volumeDown" };
             ("audioVolume", cmd.to_string(), vec![])
         }
 
-        "mute_toggle" => {
-            if has("samsungvd.remoteControl") {
-                // tecla MUTE real do controle da TV (alterna)
+        "mute" => {
+            if has_cap(&cfg, "samsungvd.remoteControl") {
                 remote_key_attempt("MUTE")?
-            } else if has("audioMute") || has("audioVolume") {
-                let component = component_for("audioMute");
+            } else if has_cap(&cfg, "audioMute") {
+                let component = component_for(&cfg, "audioMute");
                 let state =
                     get_status(&token, &device_id, &component, "audioMute", "mute").await?;
-                let muted = match state.as_deref() {
-                    Some("muted") | Some("mute") | Some("on") | Some("true") => true,
-                    Some("unmuted") | Some("unmute") | Some("off") | Some("false") => false,
-                    _ => cfg.muted.unwrap_or(false),
-                };
-                new_muted = Some(!muted);
+                let muted = matches!(
+                    state.as_deref(),
+                    Some("muted") | Some("mute") | Some("on") | Some("true")
+                );
                 let cmd = if muted { "unmute" } else { "mute" };
                 ("audioMute", cmd.to_string(), vec![])
             } else {
@@ -422,7 +531,7 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
         }
 
         "channel_up" | "channel_down" => {
-            if !has("tvChannel") {
+            if !has_cap(&cfg, "tvChannel") {
                 return Err("Troca de canal não disponível no modo nuvem para esta TV.".into());
             }
             let cmd = if action == "channel_up" { "channelUp" } else { "channelDown" };
@@ -430,22 +539,22 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
         }
 
         "play_pause" => {
-            if has("samsungvd.remoteControl") {
-                // tecla PLAY_BACK real (alterna play/pause como no controle)
+            if has_cap(&cfg, "samsungvd.remoteControl") {
                 remote_key_attempt("PLAY_BACK")?
-            } else if has("mediaPlayback") {
-                let component = component_for("mediaPlayback");
-                let state =
-                    get_status(&token, &device_id, &component, "mediaPlayback", "playbackStatus")
-                        .await?;
-                let playing = match state.as_deref() {
-                    Some("play") | Some("playing") | Some("fast forward")
-                    | Some("fast forwarding") => true,
-                    Some("pause") | Some("paused") | Some("stop") | Some("stopped")
-                    | Some("rewind") | Some("rewinding") => false,
-                    _ => cfg.playing.unwrap_or(false),
-                };
-                new_playing = Some(!playing);
+            } else if has_cap(&cfg, "mediaPlayback") {
+                let component = component_for(&cfg, "mediaPlayback");
+                let state = get_status(
+                    &token,
+                    &device_id,
+                    &component,
+                    "mediaPlayback",
+                    "playbackStatus",
+                )
+                .await?;
+                let playing = matches!(
+                    state.as_deref(),
+                    Some("play") | Some("playing") | Some("fast forward") | Some("fast forwarding")
+                );
                 let cmd = if playing { "pause" } else { "play" };
                 ("mediaPlayback", cmd.to_string(), vec![])
             } else {
@@ -453,119 +562,43 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
             }
         }
 
+        "rewind" | "fast_forward" => {
+            if !has_cap(&cfg, "mediaPlayback") && !has_cap(&cfg, "samsungvd.remoteControl") {
+                return Err("Mídia não disponível no modo nuvem para esta TV.".into());
+            }
+            if has_cap(&cfg, "mediaPlayback") {
+                let cmd = if action == "rewind" { "rewind" } else { "fastForward" };
+                ("mediaPlayback", cmd.to_string(), vec![])
+            } else {
+                remote_key_attempt(if action == "rewind" { "REWIND" } else { "FF" })?
+            }
+        }
+
+        "set_input" => {
+            let id = arg.ok_or("Entrada ausente para a troca de fonte")?;
+            let capability = if has_cap(&cfg, "samsungvd.mediaInputSource") {
+                "samsungvd.mediaInputSource"
+            } else if has_cap(&cfg, "mediaInputSource") {
+                "mediaInputSource"
+            } else {
+                return Err("Troca de entrada não disponível no modo nuvem para esta TV.".into());
+            };
+            (capability, "setInputSource".to_string(), vec![Value::String(id)])
+        }
+
+        "source_key" => {
+            if !has_cap(&cfg, "samsungvd.remoteControl") {
+                return Err("Esta TV não aceita a tecla Fonte pela nuvem.".into());
+            }
+            remote_key_attempt("SOURCE")?
+        }
+
         "remote_key" => {
-            if !has("samsungvd.remoteControl") {
+            if !has_cap(&cfg, "samsungvd.remoteControl") {
                 return Err("Esta TV não aceita teclas de navegação pela nuvem.".into());
             }
             let key = arg.ok_or("Tecla ausente para o comando de navegação")?;
             remote_key_attempt(key.trim().to_uppercase().as_str())?
-        }
-
-        "rewind" | "fast_forward" => {
-            if !has("mediaPlayback") {
-                return Err("Mídia não disponível no modo nuvem para esta TV.".into());
-            }
-            let cmd = if action == "rewind" { "rewind" } else { "fastForward" };
-            ("mediaPlayback", cmd.to_string(), vec![])
-        }
-
-        "queue_next" => ("mediaTrackControl", "trackNext".to_string(), vec![]),
-
-        "cycle_input" => {
-            if has("samsungvd.mediaInputSource") {
-                // Variante Samsung: traz a lista real de entradas (com os nomes
-                // configurados para cada HDMI, ex.: "XBOX One").
-                let component = component_for("samsungvd.mediaInputSource");
-                let raw = get_status_raw(
-                    &token,
-                    &device_id,
-                    &component,
-                    "samsungvd.mediaInputSource",
-                    "supportedInputSourcesMap",
-                )
-                .await?;
-
-                let list: Vec<String> = raw
-                    .and_then(|v| serde_json::from_value::<Vec<Value>>(v).ok())
-                    .map(|items| {
-                        items
-                            .iter()
-                            .filter_map(|item| {
-                                item.get("id").and_then(|v| v.as_str()).map(str::to_string)
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
-
-                if list.is_empty() {
-                    return Err("A TV não informou as entradas disponíveis.".into());
-                }
-
-                let current = get_status(
-                    &token,
-                    &device_id,
-                    &component,
-                    "samsungvd.mediaInputSource",
-                    "inputSource",
-                )
-                .await?;
-
-                let idx = current
-                    .as_ref()
-                    .and_then(|c| list.iter().position(|x| x == c))
-                    .map(|i| (i + 1) % list.len())
-                    .unwrap_or(0);
-
-                let target = list[idx].clone();
-                (
-                    "samsungvd.mediaInputSource",
-                    "setInputSource".to_string(),
-                    vec![Value::String(target)],
-                )
-            } else if has("mediaInputSource") {
-                let component = component_for("mediaInputSource");
-                let current =
-                    get_status(&token, &device_id, &component, "mediaInputSource", "inputSource")
-                        .await?;
-                let supported = get_status(
-                    &token,
-                    &device_id,
-                    &component,
-                    "mediaInputSource",
-                    "supportedInputSources",
-                )
-                .await?;
-                // supportedInputSources pode vir como lista JSON ou string
-                // separada por vírgulas, dependendo da TV.
-                let list: Vec<String> = supported
-                    .as_deref()
-                    .map(|s| {
-                        s.split(',')
-                            .map(|x| x.trim().trim_matches('"').trim_matches('[').trim_matches(']'))
-                            .filter(|x| !x.is_empty())
-                            .map(str::to_string)
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let next = if list.is_empty() {
-                    None
-                } else {
-                    let idx = current
-                        .as_ref()
-                        .and_then(|c| list.iter().position(|x| x == c))
-                        .map(|i| (i + 1) % list.len())
-                        .unwrap_or(0);
-                    list.get(idx).cloned()
-                };
-                let target = next.ok_or("A TV não informou as entradas disponíveis.")?;
-                (
-                    "mediaInputSource",
-                    "setInputSource".to_string(),
-                    vec![Value::String(target)],
-                )
-            } else {
-                return Err("Troca de entrada não disponível no modo nuvem para esta TV.".into());
-            }
         }
 
         "launch_app" => {
@@ -577,13 +610,11 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
             )
         }
 
-        other => return Err(format!("Ação \"{other}\" não suportada no modo nuvem.")),
+        other => return Err(format!("Ação \"{other}\" não suportada.")),
     };
 
-    // Envia o comando; se a TV recusar, tenta variações equivalentes
-    // (ex.: setMute em vez de mute, setPlaybackStatus em vez de pause).
-    let component = component_for(capability);
-    let mut result = send_command(
+    let component = component_for(&cfg, capability);
+    send_command(
         &token,
         &device_id,
         &component,
@@ -591,53 +622,5 @@ pub async fn execute(app: &AppHandle, action: &str, arg: Option<String>) -> Resu
         &command,
         arguments,
     )
-    .await;
-
-    if result.is_err() && capability == "audioMute" {
-        let want_muted = command == "mute";
-        result = send_command(
-            &token,
-            &device_id,
-            &component,
-            "audioMute",
-            "setMute",
-            vec![Value::Bool(want_muted)],
-        )
-        .await;
-
-        if result.is_err() {
-            result = send_command(&token, &device_id, &component, "audioVolume", &command, vec![])
-                .await;
-        }
-    }
-
-    if result.is_err()
-        && capability == "mediaPlayback"
-        && (command == "play" || command == "pause")
-    {
-        result = send_command(
-            &token,
-            &device_id,
-            &component,
-            "mediaPlayback",
-            "setPlaybackStatus",
-            vec![Value::String(command.clone())],
-        )
-        .await;
-    }
-
-    result?;
-
-    if new_muted.is_some() || new_playing.is_some() {
-        let mut updated = cfg;
-        if let Some(m) = new_muted {
-            updated.muted = Some(m);
-        }
-        if let Some(p) = new_playing {
-            updated.playing = Some(p);
-        }
-        save(app, &updated);
-    }
-
-    Ok(())
+    .await
 }

@@ -745,6 +745,51 @@ code {
   font-size: 0.72rem;
 }
 
+/* ------------------------------------------------------ seletor de entrada */
+
+.input-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 15, 0.72);
+  display: grid;
+  place-items: center;
+  z-index: 60;
+  backdrop-filter: blur(2px);
+}
+
+.input-menu {
+  width: min(420px, 90vw);
+}
+
+.input-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-item {
+  appearance: none;
+  text-align: left;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: #0e1422;
+  border: 1px solid var(--key-border);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.input-item:hover {
+  background: var(--key-hover);
+}
+
+.input-item.current {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* --------------------------------------------------------------- toasts */
 
 .toast-stack {
