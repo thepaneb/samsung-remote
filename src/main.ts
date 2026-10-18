@@ -139,6 +139,7 @@ const CLOUD_KEY_CAPABILITY: Record<string, string[]> = {
 
 // Atalhos de apps (IDs da lista da comunidade; variam por região/ano)
 const APP_PRESETS: TvApp[] = [
+  { appId: "tv_plus", name: "TV Plus" },
   { appId: "11101200001", name: "Netflix" },
   { appId: "111299001912", name: "YouTube" },
   { appId: "3201512006785", name: "Prime Video" },
@@ -256,6 +257,14 @@ async function stExecute(action: string, arg?: string): Promise<boolean> {
 }
 
 function launchAppById(appId: string) {
+  // O Samsung TV Plus (canais gratuitos) é acessado pelo canal 2000 na TV.
+  if (appId === "tv_plus") {
+    void stExecute("set_channel", "2000").then((ok) => {
+      if (ok) toast("Abrindo o Samsung TV Plus (canal 2000).", "success");
+    });
+    return;
+  }
+
   void stExecute("launch_app", appId).then((ok) => {
     if (ok) toast("App enviado para a TV.", "success");
   });
