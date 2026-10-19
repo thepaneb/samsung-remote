@@ -144,7 +144,7 @@ body {
   flex-wrap: wrap;
 }
 
-@media (max-width: 1030px) {
+@media (max-width: 900px) {
   .layout {
     display: flex;
     flex-direction: column;
@@ -944,13 +944,13 @@ code {
     padding: 13px;
   }
 
-  /* D-pad em uma linha; canal e volume juntos na de baixo */
+  /* D-pad em uma linha; volume e canal juntos na de baixo */
   .row-main {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-areas:
       "dpad dpad"
-      "ch vol";
+      "vol ch";
     align-items: center;
     gap: 14px 16px;
     padding: 4px 0;
@@ -963,12 +963,12 @@ code {
 
   .row-main .rocker-ch {
     grid-area: ch;
-    justify-self: end;
+    justify-self: start;
   }
 
   .row-main .rocker-vol {
     grid-area: vol;
-    justify-self: start;
+    justify-self: end;
   }
 
   .key.round {
