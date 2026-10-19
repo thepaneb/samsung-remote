@@ -21,9 +21,12 @@ local (WebSocket).
 - ⭐ **Favoritos** — atalhos configuráveis para canais ou apps (salvos no aparelho)
 - ℹ️ **Sobre a TV** — modelo, sistema, firmware e suporte a ligar pela nuvem
 - 📳 **Vibração** nos botões (Android)
-- 🚀 **Atalhos de apps** (Netflix, YouTube, Prime Video, Disney+, Globoplay, Max, Spotify, Internet)
-  + campo para abrir qualquer app por ID
+- 🚀 **Atalhos de apps gerenciáveis** — catálogo com 20 apps (Netflix, YouTube, Prime Video, Disney+,
+  Globoplay, Max, Telecine, Paramount+, Apple TV, Spotify, Deezer, TIDAL, Pluto TV, Plex, Twitch,
+  TikTok, Internet, Galeria…), adição por ID personalizado, **reordenar (▲▼) e remover (×)**,
+  tudo salvo no aparelho
 - 📺 **Samsung TV Plus** — atalho que sintoniza o **canal 2000** (primeiro canal do TV Plus no Brasil)
+  e depois lembra o último canal ≥ 2000 usado
 - ⌨️ **Atalhos de teclado**: setas = navegar • Enter = OK • Backspace = voltar • `+`/`−` volume •
   `M` mudo • `Espaço`/`P` play-pause • `H` início
 - 🔒 Token salvo localmente (você pode removê-lo a qualquer momento no próprio app)
