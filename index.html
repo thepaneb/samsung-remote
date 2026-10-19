@@ -184,19 +184,11 @@
         <section class="card" id="apps-card">
           <div class="card-head">
             <h2>Atalhos de apps</h2>
+            <button class="btn" id="apps-edit">Editar</button>
           </div>
           <div class="app-grid" id="app-grid"></div>
-          <form class="inline-form" id="app-custom-form">
-            <input
-              id="app-custom-id"
-              placeholder="ID do app (ex.: 11101200001)"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button class="btn" type="submit">Abrir</button>
-          </form>
-          <p class="hint">
-            Os IDs variam por região/ano da TV. Se algum abrir o app errado, tente outro ID.
+          <p class="empty hidden" id="apps-empty">
+            Nenhum atalho configurado. Toque em “Editar” para adicionar apps.
           </p>
         </section>
 
@@ -306,6 +298,31 @@
         </form>
         <p class="hint" style="margin-top: 14px">Favoritos existentes</p>
         <div class="fav-list" id="fav-list"></div>
+      </div>
+    </div>
+
+    <div class="input-overlay hidden" id="apps-overlay">
+      <div class="input-menu card">
+        <div class="card-head">
+          <h2>Meus apps</h2>
+          <button class="btn ghost" id="apps-close">×</button>
+        </div>
+        <p class="hint">Adicionar do catálogo</p>
+        <div class="inline-form">
+          <select id="apps-catalog"></select>
+          <button class="btn primary" id="apps-catalog-add">Adicionar</button>
+        </div>
+        <p class="hint">Ou informe um ID</p>
+        <div class="inline-form">
+          <input id="apps-custom-id" placeholder="ID do app" autocomplete="off" spellcheck="false" />
+          <input id="apps-custom-name" placeholder="Nome (opcional)" autocomplete="off" />
+          <button class="btn" id="apps-custom-add" title="Adicionar">＋</button>
+        </div>
+        <p class="hint" style="margin-top: 14px">Seus atalhos — use ▲▼ para reordenar</p>
+        <div class="apps-manage" id="apps-manage"></div>
+        <p class="hint">
+          Os IDs variam por região/ano da TV. Se algum abrir o app errado, remova e tente outro ID.
+        </p>
       </div>
     </div>
 

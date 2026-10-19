@@ -750,6 +750,43 @@ body {
   gap: 6px;
 }
 
+.apps-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.manage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #0e1422;
+  border: 1px solid var(--key-border);
+  font-size: 0.82rem;
+}
+
+.manage-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manage-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.manage-actions .btn {
+  padding: 5px 9px;
+  font-size: 0.78rem;
+}
+
 .fav-row {
   display: flex;
   align-items: center;

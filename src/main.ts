@@ -20,9 +20,10 @@ interface StInput {
   current: boolean;
 }
 
-interface TvApp {
-  appId: string;
+interface AppShortcut {
+  id: string;
   name: string;
+  appId: string;
 }
 
 interface StMode {
@@ -73,8 +74,16 @@ const stUse = $<HTMLButtonElement>("#st-use");
 const stRemove = $<HTMLButtonElement>("#st-remove");
 const stStatusText = $<HTMLParagraphElement>("#st-status-text");
 const appGrid = $<HTMLDivElement>("#app-grid");
-const appCustomForm = $<HTMLFormElement>("#app-custom-form");
-const appCustomId = $<HTMLInputElement>("#app-custom-id");
+const appsEmpty = $<HTMLParagraphElement>("#apps-empty");
+const appsEdit = $<HTMLButtonElement>("#apps-edit");
+const appsOverlay = $<HTMLDivElement>("#apps-overlay");
+const appsClose = $<HTMLButtonElement>("#apps-close");
+const appsCatalog = $<HTMLSelectElement>("#apps-catalog");
+const appsCatalogAdd = $<HTMLButtonElement>("#apps-catalog-add");
+const appsCustomId = $<HTMLInputElement>("#apps-custom-id");
+const appsCustomName = $<HTMLInputElement>("#apps-custom-name");
+const appsCustomAdd = $<HTMLButtonElement>("#apps-custom-add");
+const appsManage = $<HTMLDivElement>("#apps-manage");
 const remoteBody = $<HTMLDivElement>("#remote-body");
 const remoteTitle = $<HTMLHeadingElement>("#remote-title");
 const remoteHint = $<HTMLParagraphElement>("#remote-hint");
@@ -180,18 +189,60 @@ const CLOUD_KEY_CAPABILITY: Record<string, string[]> = {
   KEY_HOME: ["samsungvd.remoteControl"],
 };
 
-// Atalhos de apps (IDs da lista da comunidade; variam por região/ano)
-const APP_PRESETS: TvApp[] = [
-  { appId: "tv_plus", name: "TV Plus" },
-  { appId: "11101200001", name: "Netflix" },
-  { appId: "111299001912", name: "YouTube" },
-  { appId: "3201512006785", name: "Prime Video" },
-  { appId: "3201901017640", name: "Disney+" },
-  { appId: "3201908019022", name: "Globoplay" },
-  { appId: "3201601007230", name: "HBO Max" },
-  { appId: "3201606009684", name: "Spotify" },
-  { appId: "org.tizen.browser", name: "Internet" },
+// Catálogo de apps conhecidos (IDs da lista da comunidade; variam por região/ano)
+const APP_CATALOG: Array<{ name: string; appId: string }> = [
+  { name: "TV Plus (canal 2000)", appId: "tv_plus" },
+  { name: "Netflix", appId: "11101200001" },
+  { name: "YouTube", appId: "111299001912" },
+  { name: "Prime Video", appId: "3201512006785" },
+  { name: "Disney+", appId: "3201901017640" },
+  { name: "Globoplay", appId: "3201908019022" },
+  { name: "HBO Max", appId: "3201601007230" },
+  { name: "Telecine", appId: "3201604009182" },
+  { name: "Paramount+", appId: "3201710014981" },
+  { name: "Apple TV", appId: "3201807016597" },
+  { name: "Apple Music", appId: "3201908019041" },
+  { name: "Spotify", appId: "3201606009684" },
+  { name: "Deezer", appId: "3201608010191" },
+  { name: "TIDAL", appId: "3201805016367" },
+  { name: "Pluto TV", appId: "3201808016802" },
+  { name: "Plex", appId: "3201512006963" },
+  { name: "Twitch", appId: "3202203026841" },
+  { name: "TikTok", appId: "3202008021577" },
+  { name: "Internet", appId: "org.tizen.browser" },
+  { name: "Galeria", appId: "3201710015037" },
 ];
+
+const DEFAULT_SHORTCUTS: AppShortcut[] = [
+  { id: "tv_plus", name: "TV Plus", appId: "tv_plus" },
+  { id: "netflix", name: "Netflix", appId: "11101200001" },
+  { id: "youtube", name: "YouTube", appId: "111299001912" },
+  { id: "prime", name: "Prime Video", appId: "3201512006785" },
+  { id: "disney", name: "Disney+", appId: "3201901017640" },
+  { id: "globoplay", name: "Globoplay", appId: "3201908019022" },
+  { id: "max", name: "HBO Max", appId: "3201601007230" },
+  { id: "spotify", name: "Spotify", appId: "3201606009684" },
+  { id: "internet", name: "Internet", appId: "org.tizen.browser" },
+];
+
+const APPS_KEY = "samsungremote.apps";
+
+function loadAppShortcuts(): AppShortcut[] {
+  try {
+    const raw = localStorage.getItem(APPS_KEY);
+    if (!raw) return [...DEFAULT_SHORTCUTS];
+    const parsed = JSON.parse(raw) as AppShortcut[];
+    return Array.isArray(parsed) ? parsed : [...DEFAULT_SHORTCUTS];
+  } catch {
+    return [...DEFAULT_SHORTCUTS];
+  }
+}
+
+let appShortcuts: AppShortcut[] = loadAppShortcuts();
+
+function saveAppShortcuts() {
+  localStorage.setItem(APPS_KEY, JSON.stringify(appShortcuts));
+}
 
 let cloudActive = false;
 let cloudCaps: string[] = [];
@@ -468,16 +519,83 @@ async function loadAbout() {
 }
 
 // ---------------------------------------------------------------------------
-// Apps
+// Apps (gerenciáveis)
 // ---------------------------------------------------------------------------
 
-function renderApps(apps: TvApp[]) {
-  appGrid.innerHTML = apps
+function renderApps() {
+  appGrid.innerHTML = appShortcuts
     .map(
       (app) =>
-        `<button class="app-tile" data-app-id="${esc(app.appId)}" title="${esc(app.name)}"><span class="app-fallback">${esc(app.name.slice(0, 1).toUpperCase() || "?")}</span><span class="app-name">${esc(app.name)}</span></button>`,
+        `<button class="app-tile" data-app-id="${esc(app.appId)}" title="${esc(app.name)} (${esc(app.appId)})"><span class="app-fallback">${esc(app.name.slice(0, 1).toUpperCase() || "?")}</span><span class="app-name">${esc(app.name)}</span></button>`,
     )
     .join("");
+  appsEmpty.classList.toggle("hidden", appShortcuts.length > 0);
+}
+
+function fillCatalog() {
+  const existing = new Set(appShortcuts.map((app) => app.appId));
+  const available = APP_CATALOG.filter((entry) => !existing.has(entry.appId));
+  appsCatalog.innerHTML = available.length
+    ? available
+        .map((entry) => `<option value="${esc(entry.appId)}">${esc(entry.name)}</option>`)
+        .join("")
+    : '<option value="">(catálogo já adicionado)</option>';
+  appsCatalogAdd.disabled = available.length === 0;
+}
+
+function renderAppsManage() {
+  appsManage.innerHTML =
+    appShortcuts.length === 0
+      ? "<p class='hint'>Nenhum atalho ainda.</p>"
+      : appShortcuts
+          .map(
+            (app, index) => `
+        <div class="manage-row">
+          <span class="manage-name" title="${esc(app.appId)}">${esc(app.name)}</span>
+          <div class="manage-actions">
+            <button class="btn ghost" data-app-up="${esc(app.id)}" ${index === 0 ? "disabled" : ""} title="Mover para cima">▲</button>
+            <button class="btn ghost" data-app-down="${esc(app.id)}" ${index === appShortcuts.length - 1 ? "disabled" : ""} title="Mover para baixo">▼</button>
+            <button class="btn ghost" data-app-remove="${esc(app.id)}" title="Remover">×</button>
+          </div>
+        </div>`,
+          )
+          .join("");
+}
+
+function refreshAppsUi() {
+  renderApps();
+  renderAppsManage();
+  fillCatalog();
+}
+
+function addShortcut(name: string, appId: string) {
+  if (appShortcuts.some((app) => app.appId === appId)) {
+    toast("Este app já está nos atalhos.", "info");
+    return;
+  }
+  appShortcuts.push({
+    id: crypto.randomUUID?.() ?? String(Date.now()),
+    name: name.trim() || appId,
+    appId,
+  });
+  saveAppShortcuts();
+  refreshAppsUi();
+  toast("App adicionado.", "success");
+}
+
+function moveShortcut(id: string, delta: number) {
+  const index = appShortcuts.findIndex((app) => app.id === id);
+  const target = index + delta;
+  if (index < 0 || target < 0 || target >= appShortcuts.length) return;
+  const [item] = appShortcuts.splice(index, 1);
+  appShortcuts.splice(target, 0, item);
+  saveAppShortcuts();
+  refreshAppsUi();
+}
+
+function openAppsDialog() {
+  appsOverlay.classList.remove("hidden");
+  refreshAppsUi();
 }
 
 // ---------------------------------------------------------------------------
@@ -810,12 +928,52 @@ appGrid.addEventListener("click", (event) => {
   launchAppById(appId);
 });
 
-appCustomForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const appId = appCustomId.value.trim();
+// Apps (gerenciar)
+appsEdit.addEventListener("click", openAppsDialog);
+appsClose.addEventListener("click", () => appsOverlay.classList.add("hidden"));
+appsOverlay.addEventListener("click", (event) => {
+  if (event.target === appsOverlay) appsOverlay.classList.add("hidden");
+});
+
+appsCatalogAdd.addEventListener("click", () => {
+  const appId = appsCatalog.value;
   if (!appId) return;
-  launchAppById(appId);
-  appCustomId.value = "";
+  const entry = APP_CATALOG.find((item) => item.appId === appId);
+  addShortcut(entry?.name ?? appId, appId);
+});
+
+appsCustomAdd.addEventListener("click", () => {
+  const appId = appsCustomId.value.trim();
+  if (!appId) {
+    toast("Informe o ID do app.", "info");
+    return;
+  }
+  addShortcut(appsCustomName.value, appId);
+  appsCustomId.value = "";
+  appsCustomName.value = "";
+});
+
+appsManage.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+
+  const up = target.closest<HTMLButtonElement>("[data-app-up]")?.dataset.appUp;
+  if (up) {
+    moveShortcut(up, -1);
+    return;
+  }
+
+  const down = target.closest<HTMLButtonElement>("[data-app-down]")?.dataset.appDown;
+  if (down) {
+    moveShortcut(down, 1);
+    return;
+  }
+
+  const remove = target.closest<HTMLButtonElement>("[data-app-remove]")?.dataset.appRemove;
+  if (remove) {
+    appShortcuts = appShortcuts.filter((app) => app.id !== remove);
+    saveAppShortcuts();
+    refreshAppsUi();
+  }
 });
 
 stForm.addEventListener("submit", async (event) => {
@@ -880,7 +1038,7 @@ aboutToggle.addEventListener("click", () => {
 // ---------------------------------------------------------------------------
 
 async function init() {
-  renderApps(APP_PRESETS);
+  renderApps();
   renderFavorites();
   applyAboutCollapsed();
 
