@@ -108,6 +108,9 @@ const favName = $<HTMLInputElement>("#fav-name");
 const favType = $<HTMLSelectElement>("#fav-type");
 const favValue = $<HTMLInputElement>("#fav-value");
 const favList = $<HTMLDivElement>("#fav-list");
+const aboutCard = $<HTMLElement>("#about-card");
+const aboutBody = $<HTMLDivElement>("#about-body");
+const aboutToggle = $<HTMLButtonElement>("#about-toggle");
 const aboutRows = $<HTMLDivElement>("#about-rows");
 const aboutRefresh = $<HTMLButtonElement>("#about-refresh");
 const toastStack = $<HTMLDivElement>("#toast-stack");
@@ -199,6 +202,19 @@ let recording = false;
 
 const FAV_KEY = "samsungremote.favorites";
 const TV_PLUS_LAST = "samsungremote.tvplus.last";
+const ST_COLLAPSED_KEY = "samsungremote.panel.st";
+const ABOUT_COLLAPSED_KEY = "samsungremote.panel.about";
+
+function readBool(key: string, fallback: boolean): boolean {
+  const raw = localStorage.getItem(key);
+  return raw === null ? fallback : raw === "1";
+}
+
+function writeBool(key: string, value: boolean) {
+  localStorage.setItem(key, value ? "1" : "0");
+}
+
+let aboutCollapsed = readBool(ABOUT_COLLAPSED_KEY, true);
 
 function loadFavorites(): Favorite[] {
   try {
@@ -260,6 +276,13 @@ function applyStCollapsed() {
   stRemove.classList.toggle("hidden", !cloudActive || stCollapsed);
 }
 
+function applyAboutCollapsed() {
+  aboutBody.classList.toggle("hidden", aboutCollapsed);
+  aboutCard.classList.toggle("st-collapsed", aboutCollapsed);
+  aboutToggle.textContent = aboutCollapsed ? "▸" : "▾";
+  aboutRefresh.classList.toggle("hidden", aboutCollapsed);
+}
+
 function applyStStatus(status: StStatus) {
   stSetup.classList.toggle("hidden", status.hasToken);
   stPanel.classList.toggle("hidden", !status.hasToken);
@@ -269,7 +292,7 @@ function applyStStatus(status: StStatus) {
     cloudActive = true;
     cloudCaps = status.capabilities;
     stDeviceLabel = status.deviceLabel ?? "TV";
-    stCollapsed = true; // já configurado: recolhe para dar menos destaque
+    stCollapsed = readBool(ST_COLLAPSED_KEY, true); // lembra a última escolha
     stStatusText.textContent = `Nuvem ativa: ${stDeviceLabel} • ${status.capabilities.length} capacidades.`;
     setStatus("connected", `Nuvem: ${stDeviceLabel}`);
     remoteTitle.textContent = stDeviceLabel;
@@ -842,7 +865,14 @@ stRemove.addEventListener("click", async () => {
 
 stToggle.addEventListener("click", () => {
   stCollapsed = !stCollapsed;
+  writeBool(ST_COLLAPSED_KEY, stCollapsed);
   applyStCollapsed();
+});
+
+aboutToggle.addEventListener("click", () => {
+  aboutCollapsed = !aboutCollapsed;
+  writeBool(ABOUT_COLLAPSED_KEY, aboutCollapsed);
+  applyAboutCollapsed();
 });
 
 // ---------------------------------------------------------------------------
@@ -852,6 +882,7 @@ stToggle.addEventListener("click", () => {
 async function init() {
   renderApps(APP_PRESETS);
   renderFavorites();
+  applyAboutCollapsed();
 
   try {
     const status = await invoke<StStatus>("st_status");

@@ -203,10 +203,15 @@
         <section class="card" id="about-card">
           <div class="card-head">
             <h2>Sobre a TV</h2>
-            <button class="btn" id="about-refresh">Atualizar</button>
+            <div class="head-actions">
+              <button class="btn" id="about-refresh">Atualizar</button>
+              <button class="btn ghost" id="about-toggle" title="Recolher ou expandir">▾</button>
+            </div>
           </div>
-          <div class="about-rows" id="about-rows">
-            <p class="hint">Carregando…</p>
+          <div id="about-body">
+            <div class="about-rows" id="about-rows">
+              <p class="hint">Carregando…</p>
+            </div>
           </div>
         </section>
       </main>
