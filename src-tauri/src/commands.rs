@@ -1,7 +1,8 @@
 //! Comandos expostos ao frontend.
 
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 
+use crate::local::{self, LocalApp, LocalState, LocalStatus};
 use crate::smartthings::{self, StDevice, StInput, StStatus};
 
 #[tauri::command]
@@ -104,4 +105,88 @@ pub async fn st_modes(app: AppHandle) -> Result<smartthings::StModes, String> {
 #[tauri::command]
 pub async fn st_about(app: AppHandle) -> Result<smartthings::StAbout, String> {
     smartthings::about_info(&app).await
+}
+
+// ---------------------------------------------------------------------------
+// Conexão direta com a TV (rede local)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn local_status(
+    app: AppHandle,
+    state: State<'_, LocalState>,
+) -> Result<LocalStatus, String> {
+    Ok(local::status(&app, &state).await)
+}
+
+#[tauri::command]
+pub async fn local_pair(
+    app: AppHandle,
+    state: State<'_, LocalState>,
+    host: String,
+    name: String,
+) -> Result<LocalStatus, String> {
+    local::pair(&app, &state, host, name).await
+}
+
+#[tauri::command]
+pub async fn local_set_enabled(
+    app: AppHandle,
+    state: State<'_, LocalState>,
+    enabled: bool,
+) -> Result<LocalStatus, String> {
+    local::set_enabled(&app, &state, enabled).await
+}
+
+#[tauri::command]
+pub async fn local_forget(app: AppHandle, state: State<'_, LocalState>) -> Result<LocalStatus, String> {
+    local::forget(&app, &state).await
+}
+
+#[tauri::command]
+pub async fn local_key(app: AppHandle, state: State<'_, LocalState>, key: String) -> Result<(), String> {
+    local::send_key(&app, &state, &key).await
+}
+
+#[tauri::command]
+pub async fn local_channel(
+    app: AppHandle,
+    state: State<'_, LocalState>,
+    value: String,
+) -> Result<(), String> {
+    local::set_channel(&app, &state, &value).await
+}
+
+#[tauri::command]
+pub async fn local_launch(
+    app: AppHandle,
+    state: State<'_, LocalState>,
+    app_id: String,
+) -> Result<(), String> {
+    local::launch(&app, &state, &app_id).await
+}
+
+#[tauri::command]
+pub async fn local_text(
+    app: AppHandle,
+    state: State<'_, LocalState>,
+    text: String,
+) -> Result<(), String> {
+    local::send_text(&app, &state, &text).await
+}
+
+#[tauri::command]
+pub async fn local_apps(
+    app: AppHandle,
+    state: State<'_, LocalState>,
+    refresh: bool,
+) -> Result<Vec<LocalApp>, String> {
+    // Sem refresh: usa a última lista carregada, se existir.
+    if !refresh {
+        let cached = local::cached_apps(&app);
+        if !cached.is_empty() {
+            return Ok(cached);
+        }
+    }
+    local::apps(&app, &state).await
 }

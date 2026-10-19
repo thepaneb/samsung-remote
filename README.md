@@ -1,8 +1,9 @@
 # Controle Remoto Samsung 🎮📺
 
-Aplicativo desktop (**Tauri 2 + Rust + TypeScript**) para controlar TVs Samsung pela
-**nuvem do SmartThings** — funciona mesmo quando a TV recusa o pareamento de controle
-local (WebSocket).
+Aplicativo desktop (**Tauri 2 + Rust + TypeScript**) e **Android** para controlar TVs
+Samsung (Tizen) de duas formas: **conexão direta pela rede local** (WebSocket seguro na
+porta 8002 — rápido, lista real de apps, tecla Guia) e **nuvem do SmartThings** (para
+ligar a TV do repouso e como reserva).
 
 ![status](https://img.shields.io/badge/Tauri-2-24C8DB) ![status](https://img.shields.io/badge/Rust-stable-orange) ![status](https://img.shields.io/badge/TypeScript-5+-3178C6)
 
@@ -10,6 +11,12 @@ local (WebSocket).
 
 - ⏻ **Power** (ligar/desligar), volume e mudo
 - 🕹️ **D-pad completo** (setas + OK), Voltar, Menu, Home e Sair
+- 🗓 **Guia de canais** (KEY_GUIDE — disponível com a conexão direta)
+- ⚡ **Conexão direta (rede)** — controle pela rede local, sem passar pela internet;
+  com **pareamento feito no próprio app** (a TV mostra um pop-up para aceitar)
+- 📱 **Lista real de apps instalados** — “Carregar da TV” traz os apps do seu modelo
+  (com nomes) para adicionar aos atalhos com um toque
+- ⌨️ **Digitar direto na TV** — envie texto para o campo em foco (busca do YouTube etc.)
 - 📺 **Seletor de entradas** — troca direta para TV, HDMI1, HDMI2… com os nomes que você configurou
 - 📡 **Canal +/−** e **play/pause**, retroceder e avançar
 - 🔢 **Canal direto** — teclado numérico para ir a um canal (ex.: `590`, `15.1`)
@@ -28,23 +35,38 @@ local (WebSocket).
 - 📺 **Samsung TV Plus** — atalho que sintoniza o **canal 2000** (primeiro canal do TV Plus no Brasil)
   e depois lembra o último canal ≥ 2000 usado
 - ⌨️ **Atalhos de teclado**: setas = navegar • Enter = OK • Backspace = voltar • `+`/`−` volume •
-  `M` mudo • `Espaço`/`P` play-pause • `H` início
-- 🔒 Token salvo localmente (você pode removê-lo a qualquer momento no próprio app)
+  `M` mudo • `Espaço`/`P` play-pause • `H` início (desktop)
+- 🔒 Tokens salvos localmente (você pode removê-los a qualquer momento no próprio app)
 
 ## Requisitos
 
-- Windows 10/11 (WebView2 já vem no Windows 11), macOS ou Linux
+- Windows 10/11 (WebView2 já vem no Windows 11), macOS ou Linux — ou Android
 - [Node.js](https://nodejs.org) 18+ e [Rust](https://rustup.rs) (stable) para compilar
 - Windows: Build Tools do Visual Studio (C++)
 
 ## Como usar
+
+### 1. Conexão direta (recomendada)
+
+1. No app, no cartão **“Conexão direta (rede)”**, informe o **IP da TV** (ex.: `192.168.0.101`)
+   — o mesmo que aparece em *Configurações → Rede → Estado da rede* na TV.
+2. Clique em **Parear com a TV**. A TV mostra um **pop-up** — escolha **Permitir** com o controle.
+3. Pronto: o controle passa a ir pela rede (mais rápido), e ficam disponíveis o **Guia**,
+   a **lista real de apps** e a **digitação direta**. O pareamento fica salvo no aparelho.
+
+> Celular e TV precisam estar na **mesma rede Wi‑Fi**.
+
+### 2. Nuvem (SmartThings) — opcional, para ligar a TV do repouso
 
 1. **Adicione a TV no app SmartThings do celular** (conta Samsung) — se ela já aparece lá, pronto.
 2. Crie um **token pessoal** em <https://account.smartthings.com/tokens>:
    - Nome: `Controle Tauri`
    - Permissões: **Devices** → leitura (**`r:devices:*`**) e execução (**`x:devices:*`**)
 3. Abra o app, cole o token no cartão **SmartThings** e clique em **Salvar**.
-4. Escolha sua TV na lista e clique em **“Usar esta TV”** — o controle está pronto.
+4. Escolha sua TV na lista e clique em **“Usar esta TV”**.
+
+Com os dois configurados, o app usa a **rede local** no dia a dia e deixa a **nuvem**
+como reserva (e para ligar a TV, que em repouso não tem rede ativa).
 
 ## Executar em desenvolvimento
 
@@ -104,6 +126,24 @@ Para instalar via USB: ative a depuração USB e rode
 
 ## Como funciona
 
+### Conexão direta (rede local)
+
+O app fala **direto com a TV** por um WebSocket TLS na porta **8002** (a mesma API usada pelo
+app oficial e pela biblioteca `samsungtvws`):
+
+| Item | Detalhe |
+| --- | --- |
+| URL | `wss://<ip>:8002/api/v2/channels/samsung.remote.control?name=<base64>&token=<token>` |
+| Pareamento | conexão sem token → pop-up na TV → token salvo em `local.json` |
+| Teclas | `ms.remote.control` com `KEY_*` (inclui `KEY_GUIDE`, `KEY_CH_LIST`, números…) |
+| Lista de apps | evento `ed.installedApp.get` (nomes + IDs reais do seu modelo) |
+| Abrir app | evento `ed.apps.launch` (`DEEP_LINK`) |
+| Digitar texto | `SendInputString` (base64) + `SendInputEnd` |
+| Canal direto | dígitos `KEY_0`…`KEY_9` + `KEY_ENTER` |
+| TLS | certificado autoassinado da TV é aceito (é a própria TV na LAN) |
+
+### Nuvem (SmartThings)
+
 O app usa a **API pública do SmartThings** (`https://api.smartthings.com/v1`) com seu token pessoal:
 
 | Ação | Capacidade / comando |
@@ -133,10 +173,13 @@ dispositivo é descoberto ao selecionar a TV e salvo em `smartthings.json` (past
 | --- | --- |
 | “Token inválido ou sem permissão” | Gere novo token marcando **Devices** com leitura **e** execução (`r:devices:*`, `x:devices:*`). |
 | TV não aparece na lista | Confirme que ela está adicionada no app SmartThings. A lista mostra primeiro os dispositivos com cara de TV; se nada bater, mostra todos. |
-| Atalho abre o app errado | IDs variam por região/ano — use o campo de ID personalizado com o código correto do seu modelo. |
-| Tecla apagada | A TV não expõe a capacidade correspondente no SmartThings; não há como enviar essa tecla pela nuvem. |
-| Guia/Canais não existem no app | O canal de controle da nuvem valida as teclas e aceita apenas: UP, DOWN, LEFT, RIGHT, OK, BACK, EXIT, MENU, HOME, MUTE, PLAY, PAUSE, STOP, REWIND, FF, PLAY_BACK, SOURCE. Guia, lista de canais, números e teclas coloridas só funcionariam com o pareamento local. |
-| Comando não faz efeito | Verifique se a TV está ligada e conectada à internet (o caminho é pela nuvem do SmartThings). |
+| Pop-up de pareamento não aparece | Confirme o IP da TV e que o celular/PC estão na **mesma rede**; tente novamente — o pop-up aparece na primeira conexão de cada nome de app. |
+| “A TV não autorizou a conexão” | Você recusou (ou o pop-up expirou). Clique em **Parear com a TV** de novo e escolha **Permitir**. |
+| Atalho abre o app errado | IDs variam por região/ano — use **“Carregar da TV”** no diálogo de apps para pegar os IDs reais do seu modelo, ou o campo de ID personalizado. |
+| Tecla apagada | A TV não expõe a capacidade correspondente (nuvem) e a conexão direta não está ativa. Pareie pela rede para habilitar as teclas locais. |
+| Guia/Canais | Funciona com a **conexão direta** (`KEY_GUIDE`). Pela nuvem não existe: o canal de controle valida as teclas e aceita apenas UP, DOWN, LEFT, RIGHT, OK, BACK, EXIT, MENU, HOME, MUTE, PLAY, PAUSE, STOP, REWIND, FF, PLAY_BACK, SOURCE. |
+| Comando não faz efeito | Verifique se a TV está ligada; com a rede ativa o comando é local, senão passa pela nuvem do SmartThings. |
+| TV desligada: o controle não responde | Em repouso a TV desliga a rede — use **Power** (nuvem) para ligar; depois os comandos voltam a ser locais. |
 | O indicador de entrada atual não acompanha trocas feitas direto na TV | Nesses modelos a nuvem congela o estado de entrada/energia. O app mantém memória própria das últimas ações feitas **por ele** e sincroniza quando a nuvem atualiza. |
 | Power alterna ao contrário (1º clique não faz o esperado) | Mesma causa acima — o app alterna com base no último estado conhecido; um clique extra resolve. |
 
@@ -145,6 +188,7 @@ dispositivo é descoberto ao selecionar a TV e salvo em `smartthings.json` (past
 ```
 src-tauri/src/
 ├── lib.rs         # bootstrap do Tauri e registro dos comandos
+├── local.rs       # conexão direta com a TV (WebSocket TLS na 8002, teclas, apps)
 ├── smartthings.rs # cliente da API SmartThings (auth, comandos, entradas)
 └── commands.rs    # comandos expostos ao frontend
 src/
@@ -155,10 +199,11 @@ index.html         # layout do controle
 
 ## Nota histórica
 
-A primeira versão deste projeto controlava a TV **localmente** (descoberta SSDP, WebSocket na
-porta 8001/8002, Wake-on-LAN), mas a TV de testes passou a **recusar todo pareamento local**
-(estado travado do serviço da TV). O projeto foi então reescrito com escopo reduzido para o
-**modo nuvem**, que funciona de forma confiável. O código local continua no histórico do Git.
+A primeira versão controlava a TV apenas localmente (SSDP + WebSocket); quando o pareamento
+passou a ser recusado pela TV, o app foi reescrito só com a **nuvem**. Depois de validar o
+pareamento pela porta **8002** (o mesmo caminho usado pela biblioteca `samsungtvws`), a
+**conexão direta voltou** — agora implementada nativamente em Rust (TLS com rustls, sem
+dependências externas para parear), com a nuvem mantida como reserva e para ligar a TV.
 
 ## Aviso
 

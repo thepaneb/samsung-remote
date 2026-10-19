@@ -109,6 +109,7 @@ body {
   grid-template-columns: minmax(0, 1fr) 390px;
   grid-template-areas:
     "remote st"
+    "remote local"
     "remote fav"
     "remote apps"
     "remote about";
@@ -118,6 +119,10 @@ body {
 
 #st-card {
   grid-area: st;
+}
+
+#local-card {
+  grid-area: local;
 }
 
 #favorites-card {
@@ -152,7 +157,7 @@ body {
     align-items: stretch;
   }
 
-  /* No celular: painel SmartThings (compacto) → controle → favoritos → apps → sobre */
+  /* No celular: SmartThings (compacto) → controle → conexão direta → favoritos → apps → sobre */
   #st-card {
     order: 0;
   }
@@ -161,16 +166,20 @@ body {
     order: 1;
   }
 
-  #favorites-card {
+  #local-card {
     order: 2;
   }
 
-  #apps-card {
+  #favorites-card {
     order: 3;
   }
 
-  #about-card {
+  #apps-card {
     order: 4;
+  }
+
+  #about-card {
+    order: 5;
   }
 }
 
@@ -196,6 +205,35 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 2px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.switch-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-2);
+  cursor: pointer;
+}
+
+.installed-add {
+  min-width: 30px;
 }
 
 .st-collapsed .card-head {

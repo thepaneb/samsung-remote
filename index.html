@@ -55,6 +55,46 @@
           </div>
         </section>
 
+        <section class="card" id="local-card">
+          <div class="card-head">
+            <div class="st-head-info">
+              <h2>Conexão direta (rede)</h2>
+              <div class="status-pill" id="local-pill" data-state="idle">
+                <span class="dot"></span>
+                <span id="local-pill-text">Não pareado</span>
+              </div>
+            </div>
+            <div class="head-actions">
+              <button class="btn ghost hidden" id="local-toggle" title="Recolher ou expandir">▾</button>
+            </div>
+          </div>
+
+          <div id="local-body">
+            <div class="inline-form">
+              <input
+                id="local-host"
+                placeholder="IP da TV (ex.: 192.168.0.101)"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <input id="local-name" placeholder="Nome do app na TV" autocomplete="off" />
+            </div>
+            <div class="row-actions">
+              <button class="btn primary" id="local-pair">Parear com a TV</button>
+              <button class="btn ghost hidden" id="local-forget">Esquecer pareamento</button>
+            </div>
+            <label class="switch-row">
+              <input type="checkbox" id="local-enabled" />
+              <span>Usar a conexão direta quando possível</span>
+            </label>
+            <p class="hint" id="local-hint">
+              Ao parear, a TV mostra um pop-up — aceite com o controle (Permitir). Depois disso o
+              controle vai pela rede (mais rápido, sem depender da nuvem) e ficam disponíveis a
+              tecla Guia e a lista real de apps instalados.
+            </p>
+          </div>
+        </section>
+
         <section class="card remote-card" id="remote-card">
           <div class="remote-top">
             <div>
@@ -145,6 +185,9 @@
             <div class="row row-pills">
               <button class="key pill wide" data-key="KEY_NUMPAD" title="Ir para um canal">
                 <span class="glyph">123</span><span class="mini">Canal</span>
+              </button>
+              <button class="key pill" data-key="KEY_GUIDE" title="Guia de canais (conexão direta)">
+                <span class="glyph">🗓</span><span class="mini">Guia</span>
               </button>
               <button class="key pill wide" data-key="KEY_SEARCH" title="Buscar na TV">
                 <span class="glyph">🔍</span><span class="mini">Buscar</span>
@@ -263,6 +306,16 @@
         <p class="hint">
           A TV abre a tela de busca com o texto preenchido (funciona como o teclado da TV).
         </p>
+        <p class="hint" style="margin-top: 14px">Ou digite direto na TV (campo em foco)</p>
+        <div class="inline-form">
+          <input
+            id="search-direct"
+            placeholder="Texto para digitar na TV"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="btn" id="search-direct-send">Digitar</button>
+        </div>
       </div>
     </div>
 
@@ -318,6 +371,11 @@
           <input id="apps-custom-name" placeholder="Nome (opcional)" autocomplete="off" />
           <button class="btn" id="apps-custom-add" title="Adicionar">＋</button>
         </div>
+        <p class="hint" style="margin-top: 14px">Apps instalados na TV (conexão direta)</p>
+        <div class="row-actions">
+          <button class="btn" id="apps-fetch">Carregar da TV</button>
+        </div>
+        <div class="apps-manage" id="apps-installed"></div>
         <p class="hint" style="margin-top: 14px">Seus atalhos — use ▲▼ para reordenar</p>
         <div class="apps-manage" id="apps-manage"></div>
         <p class="hint">

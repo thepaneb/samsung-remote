@@ -61,6 +61,8 @@ pub struct StStatus {
     pub device_id: Option<String>,
     pub device_label: Option<String>,
     pub capabilities: Vec<String>,
+    /// último estado de energia conhecido (memória local do app)
+    pub power_on: Option<bool>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -151,6 +153,7 @@ pub fn status(app: &AppHandle) -> StStatus {
         device_id: cfg.device_id,
         device_label: cfg.device_label,
         capabilities: cfg.capabilities,
+        power_on: cfg.power_on,
     }
 }
 

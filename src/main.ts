@@ -12,6 +12,7 @@ interface StStatus {
   deviceId?: string | null;
   deviceLabel?: string | null;
   capabilities: string[];
+  powerOn?: boolean | null;
 }
 
 interface StInput {
@@ -50,6 +51,19 @@ interface StAbout {
   capabilities: number;
 }
 
+interface LocalStatus {
+  host: string | null;
+  name: string | null;
+  hasToken: boolean;
+  connected: boolean;
+  enabled: boolean;
+}
+
+interface LocalApp {
+  appId: string;
+  name: string;
+}
+
 interface Favorite {
   id: string;
   name: string;
@@ -84,6 +98,20 @@ const appsCustomId = $<HTMLInputElement>("#apps-custom-id");
 const appsCustomName = $<HTMLInputElement>("#apps-custom-name");
 const appsCustomAdd = $<HTMLButtonElement>("#apps-custom-add");
 const appsManage = $<HTMLDivElement>("#apps-manage");
+const appsInstalled = $<HTMLDivElement>("#apps-installed");
+const appsFetch = $<HTMLButtonElement>("#apps-fetch");
+const localCard = $<HTMLElement>("#local-card");
+const localBody = $<HTMLDivElement>("#local-body");
+const localToggle = $<HTMLButtonElement>("#local-toggle");
+const localPill = $<HTMLDivElement>("#local-pill");
+const localPillText = $<HTMLSpanElement>("#local-pill-text");
+const localHost = $<HTMLInputElement>("#local-host");
+const localName = $<HTMLInputElement>("#local-name");
+const localPair = $<HTMLButtonElement>("#local-pair");
+const localForget = $<HTMLButtonElement>("#local-forget");
+const localEnabled = $<HTMLInputElement>("#local-enabled");
+const searchDirect = $<HTMLInputElement>("#search-direct");
+const searchDirectSend = $<HTMLButtonElement>("#search-direct-send");
 const remoteBody = $<HTMLDivElement>("#remote-body");
 const remoteTitle = $<HTMLHeadingElement>("#remote-title");
 const remoteHint = $<HTMLParagraphElement>("#remote-hint");
@@ -189,6 +217,29 @@ const CLOUD_KEY_CAPABILITY: Record<string, string[]> = {
   KEY_HOME: ["samsungvd.remoteControl"],
 };
 
+// Teclas que podem ser enviadas pela conexão direta (rede local)
+const LOCAL_KEYS = new Set([
+  "KEY_UP",
+  "KEY_DOWN",
+  "KEY_LEFT",
+  "KEY_RIGHT",
+  "KEY_ENTER",
+  "KEY_RETURN",
+  "KEY_MENU",
+  "KEY_EXIT",
+  "KEY_HOME",
+  "KEY_MUTE",
+  "KEY_VOLUP",
+  "KEY_VOLDOWN",
+  "KEY_CHUP",
+  "KEY_CHDOWN",
+  "KEY_PLAY_BACK",
+  "KEY_REWIND",
+  "KEY_FF",
+  "KEY_STOP",
+  "KEY_GUIDE",
+]);
+
 // Catálogo de apps conhecidos (IDs da lista da comunidade; variam por região/ano)
 const APP_CATALOG: Array<{ name: string; appId: string }> = [
   { name: "TV Plus (canal 2000)", appId: "tv_plus" },
@@ -239,6 +290,7 @@ function loadAppShortcuts(): AppShortcut[] {
 }
 
 let appShortcuts: AppShortcut[] = loadAppShortcuts();
+let installedApps: LocalApp[] = [];
 
 function saveAppShortcuts() {
   localStorage.setItem(APPS_KEY, JSON.stringify(appShortcuts));
@@ -251,9 +303,21 @@ let stDeviceLabel: string | null = null;
 let channelValue = "";
 let recording = false;
 
+// Conexão direta (rede local)
+let localCfg: LocalStatus = {
+  host: null,
+  name: null,
+  hasToken: false,
+  connected: false,
+  enabled: false,
+};
+let powerOn: boolean | null = null; // null = desconhecido
+let localCooldownUntil = 0; // evita tentar a rede logo depois de uma falha
+
 const FAV_KEY = "samsungremote.favorites";
 const TV_PLUS_LAST = "samsungremote.tvplus.last";
 const ST_COLLAPSED_KEY = "samsungremote.panel.st";
+const LOCAL_COLLAPSED_KEY = "samsungremote.panel.local";
 const ABOUT_COLLAPSED_KEY = "samsungremote.panel.about";
 
 function readBool(key: string, fallback: boolean): boolean {
@@ -266,6 +330,7 @@ function writeBool(key: string, value: boolean) {
 }
 
 let aboutCollapsed = readBool(ABOUT_COLLAPSED_KEY, true);
+let localCollapsed = readBool(LOCAL_COLLAPSED_KEY, true);
 
 function loadFavorites(): Favorite[] {
   try {
@@ -306,10 +371,27 @@ function setStatus(state: "idle" | "connecting" | "waiting" | "connected" | "err
 }
 
 function refreshRemoteAvailability() {
-  remoteBody.classList.toggle("disabled", !cloudActive);
+  const local = localActive();
+  remoteBody.classList.toggle("disabled", !cloudActive && !local);
 
   remoteBody.querySelectorAll<HTMLButtonElement>("button.key[data-key]").forEach((button) => {
     const key = button.dataset.key ?? "";
+
+    if (key === "KEY_GUIDE") {
+      button.classList.toggle("cloud-off", !local);
+      return;
+    }
+
+    if ((key === "KEY_NUMPAD" || key === "KEY_SOURCE" || key === "KEY_SEARCH") && local) {
+      button.classList.toggle("cloud-off", false);
+      return;
+    }
+
+    if (LOCAL_KEYS.has(key) && local) {
+      button.classList.toggle("cloud-off", false);
+      return;
+    }
+
     const caps = CLOUD_KEY_CAPABILITY[key];
     const ok = cloudActive && caps !== undefined && caps.some((c) => cloudCaps.includes(c));
     button.classList.toggle("cloud-off", !ok);
@@ -339,6 +421,10 @@ function applyStStatus(status: StStatus) {
   stPanel.classList.toggle("hidden", !status.hasToken);
   stToggle.classList.toggle("hidden", !status.hasToken);
 
+  if (status.powerOn !== null && status.powerOn !== undefined) {
+    powerOn = status.powerOn;
+  }
+
   if (status.hasToken && status.deviceId) {
     cloudActive = true;
     cloudCaps = status.capabilities;
@@ -346,8 +432,6 @@ function applyStStatus(status: StStatus) {
     stCollapsed = readBool(ST_COLLAPSED_KEY, true); // lembra a última escolha
     stStatusText.textContent = `Nuvem ativa: ${stDeviceLabel} • ${status.capabilities.length} capacidades.`;
     setStatus("connected", `Nuvem: ${stDeviceLabel}`);
-    remoteTitle.textContent = stDeviceLabel;
-    remoteHint.textContent = "Controles enviados pela nuvem do SmartThings.";
   } else {
     cloudActive = false;
     cloudCaps = [];
@@ -357,11 +441,10 @@ function applyStStatus(status: StStatus) {
       ? "Token salvo. Escolha a TV abaixo e clique em “Usar esta TV”."
       : "";
     setStatus("idle", status.hasToken ? "Escolha a TV" : "Não configurado");
-    remoteTitle.textContent = "Controle";
-    remoteHint.textContent = "Conecte sua conta SmartThings para controlar a TV.";
   }
 
   applyStCollapsed();
+  updateRemoteHeader();
   refreshRemoteAvailability();
 }
 
@@ -392,9 +475,23 @@ function launchAppById(appId: string) {
     return;
   }
 
-  void stExecute("launch_app", appId).then((ok) => {
-    if (ok) toast("App enviado para a TV.", "success");
-  });
+  const cloudLaunch = () =>
+    void stExecute("launch_app", appId).then((ok) => {
+      if (ok) toast("App enviado para a TV.", "success");
+    });
+
+  if (localUsable()) {
+    void tryLocal("local_launch", { appId }).then((error) => {
+      if (!error) {
+        toast("App aberto na TV.", "success");
+        return;
+      }
+      cloudLaunch();
+    });
+    return;
+  }
+
+  cloudLaunch();
 }
 
 // ---------------------------------------------------------------------------
@@ -436,9 +533,8 @@ function renderFavList() {
 
 async function runFavorite(fav: Favorite) {
   if (fav.type === "channel") {
-    const ok = await stExecute("set_channel", fav.value);
+    const ok = await sendChannel(fav.value);
     if (ok) {
-      rememberTvPlus(fav.value);
       toast(`Canal ${fav.value}`, "success");
     }
     return;
@@ -447,8 +543,8 @@ async function runFavorite(fav: Favorite) {
 }
 
 function openFavoriteDialog() {
-  if (!cloudActive) {
-    toast("Conecte-se ao SmartThings primeiro.", "info");
+  if (!cloudActive && !localActive()) {
+    toast("Conecte-se ao SmartThings ou pareie a TV para usar favoritos.", "info");
     return;
   }
   favOverlay.classList.remove("hidden");
@@ -457,25 +553,26 @@ function openFavoriteDialog() {
 }
 
 async function openTvPlus() {
-  if (!cloudActive) return;
+  if (!cloudActive && !localActive()) return;
   let target = localStorage.getItem(TV_PLUS_LAST) ?? "2000";
 
-  try {
-    const info = await invoke<{ current: string | null; name: string | null }>("st_channel");
-    const current = info.current;
-    if (current) {
-      const num = Number(current.split(".")[0]);
-      if (Number.isFinite(num) && num >= 2000) {
-        target = current;
+  if (cloudActive) {
+    try {
+      const info = await invoke<{ current: string | null; name: string | null }>("st_channel");
+      const current = info.current;
+      if (current) {
+        const num = Number(current.split(".")[0]);
+        if (Number.isFinite(num) && num >= 2000) {
+          target = current;
+        }
       }
+    } catch {
+      // mantém o último canal memorizado
     }
-  } catch {
-    // mantém o último canal memorizado
   }
 
-  const ok = await stExecute("set_channel", target);
+  const ok = await sendChannel(target);
   if (ok) {
-    localStorage.setItem(TV_PLUS_LAST, target);
     toast(`TV Plus: canal ${target}`, "success");
   }
 }
@@ -566,6 +663,55 @@ function refreshAppsUi() {
   renderApps();
   renderAppsManage();
   fillCatalog();
+  renderInstalled();
+}
+
+function renderInstalled() {
+  if (installedApps.length === 0) {
+    appsInstalled.innerHTML = localActive()
+      ? "<p class='hint'>Toque em “Carregar da TV” para ver os apps instalados.</p>"
+      : "<p class='hint'>Disponível com o pareamento da conexão direta (rede).</p>";
+    return;
+  }
+
+  appsInstalled.innerHTML = installedApps
+    .map((app) => {
+      const added = appShortcuts.some((shortcut) => shortcut.appId === app.appId);
+      return `
+        <div class="manage-row">
+          <span class="manage-name" title="${esc(app.appId)}">${esc(app.name)}</span>
+          <div class="manage-actions">
+            <button class="btn ghost installed-add" data-install="${esc(app.appId)}" data-install-name="${esc(app.name)}" ${added ? "disabled" : ""} title="${added ? "Já está nos atalhos" : "Adicionar aos atalhos"}">＋</button>
+          </div>
+        </div>`;
+    })
+    .join("");
+}
+
+async function fetchInstalled(refresh: boolean) {
+  if (!localActive()) {
+    if (refresh) {
+      toast("Pareie a TV na “Conexão direta” para carregar a lista real.", "info");
+    }
+    renderInstalled();
+    return;
+  }
+
+  appsFetch.disabled = true;
+  appsFetch.textContent = refresh ? "Carregando…" : appsFetch.textContent;
+
+  try {
+    installedApps = await invoke<LocalApp[]>("local_apps", { refresh });
+    if (refresh) {
+      toast(`${installedApps.length} app(s) carregado(s) da TV.`, "success");
+    }
+  } catch (error) {
+    if (refresh) toast(String(error), "error");
+  } finally {
+    appsFetch.disabled = false;
+    appsFetch.textContent = "Carregar da TV";
+    renderInstalled();
+  }
 }
 
 function addShortcut(name: string, appId: string) {
@@ -596,6 +742,188 @@ function moveShortcut(id: string, delta: number) {
 function openAppsDialog() {
   appsOverlay.classList.remove("hidden");
   refreshAppsUi();
+  void fetchInstalled(false);
+}
+
+// ---------------------------------------------------------------------------
+// Conexão direta (rede local)
+// ---------------------------------------------------------------------------
+
+function localActive(): boolean {
+  return localCfg.enabled && localCfg.hasToken;
+}
+
+function localUsable(): boolean {
+  // powerOn === false: TV desligada (não adianta tentar a rede agora)
+  return localActive() && powerOn !== false && Date.now() >= localCooldownUntil;
+}
+
+function updateRemoteHeader() {
+  if (localActive()) {
+    remoteHint.textContent = cloudActive
+      ? "Controles pela rede local (nuvem como reserva)."
+      : "Controles pela rede local.";
+  } else if (cloudActive) {
+    remoteHint.textContent = "Controles enviados pela nuvem do SmartThings.";
+  } else {
+    remoteHint.textContent = "Conecte o SmartThings (nuvem) ou pareie a TV na conexão direta.";
+  }
+  remoteTitle.textContent = stDeviceLabel ?? (localActive() ? "Sua TV" : "Controle");
+}
+
+function applyLocalCollapsed() {
+  localBody.classList.toggle("hidden", localCollapsed);
+  localCard.classList.toggle("st-collapsed", localCollapsed);
+  localToggle.textContent = localCollapsed ? "▸" : "▾";
+}
+
+function renderLocalStatus() {
+  if (document.activeElement !== localHost && localCfg.host) localHost.value = localCfg.host;
+  if (document.activeElement !== localName && localCfg.name) localName.value = localCfg.name;
+  localEnabled.checked = localCfg.enabled;
+  localForget.classList.toggle("hidden", !localCfg.hasToken);
+  localToggle.classList.toggle("hidden", !localCfg.hasToken);
+
+  if (!localCfg.hasToken) {
+    localPill.dataset.state = "idle";
+    localPillText.textContent = "Não pareado";
+  } else if (localCfg.connected) {
+    localPill.dataset.state = "connected";
+    localPillText.textContent = `Direto: ${localCfg.host ?? "TV"}`;
+  } else {
+    localPill.dataset.state = "waiting";
+    localPillText.textContent = "Pareado (em espera)";
+  }
+
+  updateRemoteHeader();
+  refreshRemoteAvailability();
+}
+
+async function refreshLocalStatus() {
+  try {
+    localCfg = await invoke<LocalStatus>("local_status");
+  } catch {
+    // mantém o último estado conhecido
+  }
+  renderLocalStatus();
+}
+
+/** Envia um comando local; devolve null em caso de sucesso ou a mensagem de erro. */
+async function tryLocal(
+  command: string,
+  args: Record<string, unknown> = {},
+): Promise<string | null> {
+  try {
+    await invoke(command, args);
+    powerOn = true;
+    localCfg.connected = true;
+    renderLocalStatus();
+    return null;
+  } catch (error) {
+    localCfg.connected = false;
+    localCooldownUntil = Date.now() + 15000;
+    renderLocalStatus();
+    return String(error);
+  }
+}
+
+async function tryLocalKey(key: string): Promise<string | null> {
+  const error = await tryLocal("local_key", { key });
+  if (!error && key === "KEY_POWER") powerOn = false;
+  return error;
+}
+
+/** Sintoniza um canal (rede local quando possível; senão pela nuvem). */
+async function sendChannel(value: string): Promise<boolean> {
+  const clean = value.trim();
+  if (!clean) return false;
+
+  if (localUsable() && !clean.includes(".")) {
+    const error = await tryLocal("local_channel", { value: clean });
+    if (!error) {
+      rememberTvPlus(clean);
+      return true;
+    }
+  }
+
+  const ok = await stExecute("set_channel", clean);
+  if (ok) rememberTvPlus(clean);
+  return ok;
+}
+
+async function powerToggle() {
+  // Pela rede só dá para alternar quando a TV já está respondendo.
+  if (localUsable()) {
+    const error = await tryLocalKey("KEY_POWER");
+    if (!error) {
+      toast("TV desligando…", "info");
+      return;
+    }
+  }
+
+  if (!cloudActive) {
+    toast("Ligue a TV pelo controle físico ou configure a nuvem.", "info");
+    return;
+  }
+
+  const ok = await stExecute("power_toggle");
+  if (ok) {
+    try {
+      const status = await invoke<StStatus>("st_status");
+      powerOn = status.powerOn ?? null;
+    } catch {
+      powerOn = null;
+    }
+  }
+}
+
+async function pairLocal() {
+  const host = localHost.value.trim();
+  const name = localName.value.trim();
+  if (!host) {
+    toast("Informe o IP da TV (ex.: 192.168.0.101).", "info");
+    return;
+  }
+
+  localPair.disabled = true;
+  localPair.textContent = "Aguardando a TV…";
+  localPill.dataset.state = "waiting";
+  localPillText.textContent = "Aceite o pop-up na TV";
+  toast("Olhe na TV: apareceu um pop-up — escolha Permitir.", "info");
+
+  try {
+    localCfg = await invoke<LocalStatus>("local_pair", { host, name });
+    localCollapsed = readBool(LOCAL_COLLAPSED_KEY, true);
+    toast("Pareado! O controle pela rede está ativo.", "success");
+  } catch (error) {
+    toast(String(error), "error");
+  } finally {
+    localPair.disabled = false;
+    localPair.textContent = "Parear com a TV";
+    renderLocalStatus();
+    applyLocalCollapsed();
+  }
+}
+
+async function forgetLocal() {
+  try {
+    localCfg = await invoke<LocalStatus>("local_forget");
+    toast("Pareamento removido.", "info");
+  } catch (error) {
+    toast(String(error), "error");
+  }
+  localCollapsed = false;
+  renderLocalStatus();
+  applyLocalCollapsed();
+}
+
+async function toggleLocalEnabled() {
+  try {
+    localCfg = await invoke<LocalStatus>("local_set_enabled", { enabled: localEnabled.checked });
+  } catch (error) {
+    toast(String(error), "error");
+  }
+  renderLocalStatus();
 }
 
 // ---------------------------------------------------------------------------
@@ -603,10 +931,16 @@ function openAppsDialog() {
 // ---------------------------------------------------------------------------
 
 function handleKey(key: string) {
-  if (!cloudActive) return;
+  if (!cloudActive && !localActive()) return;
 
   if (key === "KEY_SOURCE") {
-    void openInputPicker();
+    // Com a nuvem usamos o seletor bonito; só com a rede local, abrimos o
+    // menu de fontes nativo da TV.
+    if (cloudActive) {
+      void openInputPicker();
+    } else {
+      void tryLocalKey("KEY_SOURCE");
+    }
     return;
   }
 
@@ -630,9 +964,42 @@ function handleKey(key: string) {
     return;
   }
 
+  if (key === "KEY_POWER") {
+    void powerToggle();
+    return;
+  }
+
+  // Teclas que a conexão direta manda na hora (com a nuvem como reserva).
+  if (LOCAL_KEYS.has(key) && localUsable()) {
+    void tryLocalKey(key).then((error) => {
+      if (!error) return;
+
+      const entry = CLOUD_KEY_ACTIONS[key];
+      if (cloudActive && entry) {
+        void stExecute(entry.action, entry.arg);
+        return;
+      }
+
+      if (key === "KEY_GUIDE") {
+        toast("Tecla Guia: aceite o pareamento no painel “Conexão direta”.", "error");
+        return;
+      }
+      toast(error, "error");
+    });
+    return;
+  }
+
+  if (key === "KEY_GUIDE") {
+    toast(
+      "A tecla Guia precisa da conexão direta — pareie a TV no painel “Conexão direta”.",
+      "info",
+    );
+    return;
+  }
+
   const entry = CLOUD_KEY_ACTIONS[key];
   if (!entry) {
-    toast("Tecla indisponível neste modelo via nuvem.", "info");
+    toast("Tecla indisponível neste modelo.", "info");
     return;
   }
   void stExecute(entry.action, entry.arg);
@@ -643,11 +1010,16 @@ function renderChannelDisplay() {
 }
 
 async function openChannelDialog() {
-  if (!cloudActive) return;
+  if (!cloudActive && !localActive()) return;
   channelValue = "";
   renderChannelDisplay();
   channelNow.textContent = "—";
   channelOverlay.classList.remove("hidden");
+
+  if (!cloudActive) {
+    channelNow.textContent = "A TV recebe os dígitos pela rede local.";
+    return;
+  }
 
   try {
     const info = await invoke<{ current: string | null; name: string | null }>("st_channel");
@@ -662,7 +1034,8 @@ async function openChannelDialog() {
 }
 
 function openSearchDialog() {
-  if (!cloudActive) return;
+  if (!cloudActive && !localActive()) return;
+  searchForm.classList.toggle("hidden", !cloudActive);
   searchOverlay.classList.remove("hidden");
   searchText.focus();
 }
@@ -752,7 +1125,7 @@ remoteBody.addEventListener("click", (event) => {
 });
 
 window.addEventListener("keydown", (event) => {
-  if (!cloudActive) return;
+  if (!cloudActive && !localActive()) return;
   const target = event.target as HTMLElement | null;
   if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
 
@@ -824,8 +1197,7 @@ channelGo.addEventListener("click", () => {
     return;
   }
   channelOverlay.classList.add("hidden");
-  rememberTvPlus(value);
-  void stExecute("set_channel", value).then((ok) => {
+  void sendChannel(value).then((ok) => {
     if (ok) toast(`Canal ${value} enviado.`, "success");
   });
 });
@@ -921,6 +1293,23 @@ searchForm.addEventListener("submit", (event) => {
   });
 });
 
+searchDirectSend.addEventListener("click", () => {
+  const text = searchDirect.value.trim();
+  if (!text) return;
+  if (!localActive()) {
+    toast("A digitação direta precisa da conexão direta (rede).", "info");
+    return;
+  }
+  void tryLocal("local_text", { text }).then((error) => {
+    if (error) {
+      toast(error, "error");
+      return;
+    }
+    toast("Texto digitado na TV.", "success");
+    searchDirect.value = "";
+  });
+});
+
 appGrid.addEventListener("click", (event) => {
   const tile = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-app-id]");
   const appId = tile?.dataset.appId;
@@ -951,6 +1340,15 @@ appsCustomAdd.addEventListener("click", () => {
   addShortcut(appsCustomName.value, appId);
   appsCustomId.value = "";
   appsCustomName.value = "";
+});
+
+appsFetch.addEventListener("click", () => void fetchInstalled(true));
+
+appsInstalled.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-install]");
+  const appId = button?.dataset.install;
+  if (!appId) return;
+  addShortcut(button?.dataset.installName ?? appId, appId);
 });
 
 appsManage.addEventListener("click", (event) => {
@@ -1027,6 +1425,16 @@ stToggle.addEventListener("click", () => {
   applyStCollapsed();
 });
 
+localToggle.addEventListener("click", () => {
+  localCollapsed = !localCollapsed;
+  writeBool(LOCAL_COLLAPSED_KEY, localCollapsed);
+  applyLocalCollapsed();
+});
+
+localPair.addEventListener("click", () => void pairLocal());
+localForget.addEventListener("click", () => void forgetLocal());
+localEnabled.addEventListener("change", () => void toggleLocalEnabled());
+
 aboutToggle.addEventListener("click", () => {
   aboutCollapsed = !aboutCollapsed;
   writeBool(ABOUT_COLLAPSED_KEY, aboutCollapsed);
@@ -1041,6 +1449,10 @@ async function init() {
   renderApps();
   renderFavorites();
   applyAboutCollapsed();
+
+  await refreshLocalStatus();
+  localCollapsed = localCfg.hasToken ? readBool(LOCAL_COLLAPSED_KEY, true) : false;
+  applyLocalCollapsed();
 
   try {
     const status = await invoke<StStatus>("st_status");

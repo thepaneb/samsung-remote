@@ -1,4 +1,5 @@
 mod commands;
+pub mod local;
 pub mod smartthings;
 
 use tauri::Manager;
@@ -6,6 +7,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(local::LocalState::new())
         .invoke_handler(tauri::generate_handler![
             commands::st_status,
             commands::st_set_token,
@@ -17,6 +19,15 @@ pub fn run() {
             commands::st_channel,
             commands::st_modes,
             commands::st_about,
+            commands::local_status,
+            commands::local_pair,
+            commands::local_set_enabled,
+            commands::local_forget,
+            commands::local_key,
+            commands::local_channel,
+            commands::local_launch,
+            commands::local_text,
+            commands::local_apps,
         ])
         .setup(|app| {
             if let Ok(dir) = app.path().app_data_dir() {
