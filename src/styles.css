@@ -106,12 +106,12 @@ body {
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: 390px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 390px;
   grid-template-areas:
-    "st remote"
-    "fav remote"
-    "apps remote"
-    "about remote";
+    "remote st"
+    "remote fav"
+    "remote apps"
+    "remote about";
   gap: 16px;
   align-items: start;
 }
