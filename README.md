@@ -11,7 +11,7 @@ ligar a TV do repouso e como reserva).
 ![Plataforma](https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android-blue)
 [![Licença: MIT](https://img.shields.io/badge/Licen%C3%A7a-MIT-green)](LICENSE)
 ![Versão](https://img.shields.io/badge/vers%C3%A3o-0.1.0-blue)
-![Node.js](https://img.shields.io/badge/Node.js-18+-339933)
+![Node.js](https://img.shields.io/badge/Node.js-22+-339933)
 ![PRs bem-vindos](https://img.shields.io/badge/PRs-bem--vindos-brightgreen)
 
 > Projeto **não oficial**, sem vínculo com a Samsung. Uso pessoal/educacional.
@@ -52,7 +52,7 @@ ligar a TV do repouso e como reserva).
 ## Requisitos
 
 - Windows 10/11 (WebView2 já vem no Windows 11), macOS ou Linux — ou Android
-- [Node.js](https://nodejs.org) 18+ e [Rust](https://rustup.rs) (stable) para compilar
+- [Node.js](https://nodejs.org) 22+ (LTS ativo) e [Rust](https://rustup.rs) (stable) para compilar
 - Windows: Build Tools do Visual Studio (C++)
 
 ## Início rápido
