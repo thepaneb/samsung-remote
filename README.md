@@ -16,6 +16,8 @@ ligar a TV do repouso e como reserva).
 
 > Projeto **não oficial**, sem vínculo com a Samsung. Uso pessoal/educacional.
 
+**Site:** <https://thepaneb.github.io/samsung-remote/>
+
 ## Funcionalidades
 
 - ⏻ **Power** (ligar/desligar), volume e mudo
