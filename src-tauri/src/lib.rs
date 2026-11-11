@@ -1,4 +1,5 @@
 mod commands;
+pub mod discovery;
 pub mod local;
 pub mod smartthings;
 
@@ -19,6 +20,7 @@ pub fn run() {
             commands::st_channel,
             commands::st_modes,
             commands::st_about,
+            commands::local_discover,
             commands::local_status,
             commands::local_pair,
             commands::local_set_enabled,

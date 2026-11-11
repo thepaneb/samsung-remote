@@ -64,6 +64,13 @@ interface LocalApp {
   name: string;
 }
 
+interface DiscoveredTv {
+  host: string;
+  name: string | null;
+  model: string | null;
+  paired: boolean;
+}
+
 interface Favorite {
   id: string;
   name: string;
@@ -108,6 +115,8 @@ const localPillText = $<HTMLSpanElement>("#local-pill-text");
 const localHost = $<HTMLInputElement>("#local-host");
 const localName = $<HTMLInputElement>("#local-name");
 const localPair = $<HTMLButtonElement>("#local-pair");
+const localDiscover = $<HTMLButtonElement>("#local-discover");
+const localFound = $<HTMLDivElement>("#local-found");
 const localForget = $<HTMLButtonElement>("#local-forget");
 const localEnabled = $<HTMLInputElement>("#local-enabled");
 const searchDirect = $<HTMLInputElement>("#search-direct");
@@ -243,11 +252,11 @@ const LOCAL_KEYS = new Set([
 // Catálogo de apps conhecidos (IDs da lista da comunidade; variam por região/ano)
 const APP_CATALOG: Array<{ name: string; appId: string }> = [
   { name: "TV Plus (canal 2000)", appId: "tv_plus" },
-  { name: "Netflix", appId: "11101200001" },
+  { name: "Netflix", appId: "3201907018807" },
   { name: "YouTube", appId: "111299001912" },
   { name: "Prime Video", appId: "3201512006785" },
   { name: "Disney+", appId: "3201901017640" },
-  { name: "Globoplay", appId: "3201908019022" },
+  { name: "Globoplay", appId: "3201510005787" },
   { name: "HBO Max", appId: "3201601007230" },
   { name: "Telecine", appId: "3201604009182" },
   { name: "Paramount+", appId: "3201710014981" },
@@ -266,11 +275,11 @@ const APP_CATALOG: Array<{ name: string; appId: string }> = [
 
 const DEFAULT_SHORTCUTS: AppShortcut[] = [
   { id: "tv_plus", name: "TV Plus", appId: "tv_plus" },
-  { id: "netflix", name: "Netflix", appId: "11101200001" },
+  { id: "netflix", name: "Netflix", appId: "3201907018807" },
   { id: "youtube", name: "YouTube", appId: "111299001912" },
   { id: "prime", name: "Prime Video", appId: "3201512006785" },
   { id: "disney", name: "Disney+", appId: "3201901017640" },
-  { id: "globoplay", name: "Globoplay", appId: "3201908019022" },
+  { id: "globoplay", name: "Globoplay", appId: "3201510005787" },
   { id: "max", name: "HBO Max", appId: "3201601007230" },
   { id: "spotify", name: "Spotify", appId: "3201606009684" },
   { id: "internet", name: "Internet", appId: "org.tizen.browser" },
@@ -467,7 +476,7 @@ async function stExecute(action: string, arg?: string): Promise<boolean> {
   }
 }
 
-function launchAppById(appId: string) {
+function launchAppById(appId: string, name?: string) {
   // O Samsung TV Plus (canais gratuitos) é acessado pelo canal 2000 na TV;
   // usamos o último canal >= 2000 sintonizado quando conhecido.
   if (appId === "tv_plus") {
@@ -481,7 +490,7 @@ function launchAppById(appId: string) {
     });
 
   if (localUsable()) {
-    void tryLocal("local_launch", { appId }).then((error) => {
+    void tryLocal("local_launch", { appId, name: name ?? null }).then((error) => {
       if (!error) {
         toast("App aberto na TV.", "success");
         return;
@@ -539,7 +548,7 @@ async function runFavorite(fav: Favorite) {
     }
     return;
   }
-  launchAppById(fav.value);
+  launchAppById(fav.value, fav.name);
 }
 
 function openFavoriteDialog() {
@@ -623,7 +632,7 @@ function renderApps() {
   appGrid.innerHTML = appShortcuts
     .map(
       (app) =>
-        `<button class="app-tile" data-app-id="${esc(app.appId)}" title="${esc(app.name)} (${esc(app.appId)})"><span class="app-fallback">${esc(app.name.slice(0, 1).toUpperCase() || "?")}</span><span class="app-name">${esc(app.name)}</span></button>`,
+        `<button class="app-tile" data-app-id="${esc(app.appId)}" data-app-name="${esc(app.name)}" title="${esc(app.name)} (${esc(app.appId)})"><span class="app-fallback">${esc(app.name.slice(0, 1).toUpperCase() || "?")}</span><span class="app-name">${esc(app.name)}</span></button>`,
     )
     .join("");
   appsEmpty.classList.toggle("hidden", appShortcuts.length > 0);
@@ -808,6 +817,70 @@ async function refreshLocalStatus() {
   renderLocalStatus();
 }
 
+// --- Busca de TVs na rede (SSDP) -------------------------------------------
+
+function renderFoundTvs(list: DiscoveredTv[]) {
+  if (list.length === 0) {
+    localFound.innerHTML = "";
+    localFound.classList.add("hidden");
+    return;
+  }
+
+  localFound.innerHTML = list
+    .map((tv) => {
+      const title = tv.name ?? "TV Samsung";
+      const tag = tv.paired ? " ✓ já pareada" : "";
+      const meta = [tv.host, tv.model].filter(Boolean).join(" • ");
+      return `<button class="input-item found-item" data-discover-host="${esc(tv.host)}" title="Selecionar esta TV"><span class="found-name">${esc(title + tag)}</span><span class="found-meta">${esc(meta)}</span></button>`;
+    })
+    .join("");
+  localFound.classList.remove("hidden");
+}
+
+function selectFoundHost(host: string) {
+  localHost.value = host;
+  localFound.querySelectorAll<HTMLButtonElement>("[data-discover-host]").forEach((button) => {
+    button.classList.toggle("current", button.dataset.discoverHost === host);
+  });
+}
+
+async function discoverLocalTvs() {
+  if (localDiscover.disabled) return;
+
+  localDiscover.disabled = true;
+  localDiscover.textContent = "Buscando na rede…";
+
+  try {
+    const found = await invoke<DiscoveredTv[]>("local_discover");
+    renderFoundTvs(found);
+
+    if (found.length === 0) {
+      toast(
+        "Nenhuma TV respondeu. Confirme que ela está ligada e na mesma rede Wi-Fi — ou informe o IP manualmente.",
+        "info",
+      );
+      return;
+    }
+
+    // Preenche o IP sozinho quando o campo ainda está vazio.
+    if (!localHost.value.trim()) {
+      selectFoundHost(found[0].host);
+    }
+
+    if (found.length === 1) {
+      const tv = found[0];
+      toast(`TV encontrada: ${tv.name ?? "Samsung"} (${tv.host}). Clique em “Parear com a TV”.`, "success");
+    } else {
+      toast(`${found.length} TVs encontradas — escolha a sua na lista.`, "success");
+    }
+  } catch (error) {
+    toast(String(error), "error");
+  } finally {
+    localDiscover.disabled = false;
+    localDiscover.textContent = "Buscar TVs na rede";
+  }
+}
+
 /** Envia um comando local; devolve null em caso de sucesso ou a mensagem de erro. */
 async function tryLocal(
   command: string,
@@ -833,10 +906,23 @@ async function tryLocalKey(key: string): Promise<string | null> {
   return error;
 }
 
-/** Sintoniza um canal (rede local quando possível; senão pela nuvem). */
+/** Sintoniza um canal (nuvem quando possível; senão pela rede local). */
 async function sendChannel(value: string): Promise<boolean> {
   const clean = value.trim();
   if (!clean) return false;
+
+  // A nuvem troca de canal/entrada direto (setTvChannel) e funciona mesmo com
+  // um app aberto na TV. Pela conexão direta só dá para "digitar" o canal:
+  // com um app em primeiro plano os dígitos são consumidos por ele e nada
+  // acontece — sem erro nenhum (o envio é aceito pelo WebSocket). Por isso a
+  // nuvem vem primeiro; a rede local fica como reserva (funciona na TV ao vivo).
+  if (cloudActive) {
+    const ok = await stExecute("set_channel", clean);
+    if (ok) {
+      rememberTvPlus(clean);
+      return true;
+    }
+  }
 
   if (localUsable() && !clean.includes(".")) {
     const error = await tryLocal("local_channel", { value: clean });
@@ -846,9 +932,7 @@ async function sendChannel(value: string): Promise<boolean> {
     }
   }
 
-  const ok = await stExecute("set_channel", clean);
-  if (ok) rememberTvPlus(clean);
-  return ok;
+  return false;
 }
 
 async function powerToggle() {
@@ -894,6 +978,7 @@ async function pairLocal() {
   try {
     localCfg = await invoke<LocalStatus>("local_pair", { host, name });
     localCollapsed = readBool(LOCAL_COLLAPSED_KEY, true);
+    localFound.classList.add("hidden");
     toast("Pareado! O controle pela rede está ativo.", "success");
   } catch (error) {
     toast(String(error), "error");
@@ -1314,7 +1399,7 @@ appGrid.addEventListener("click", (event) => {
   const tile = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-app-id]");
   const appId = tile?.dataset.appId;
   if (!appId) return;
-  launchAppById(appId);
+  launchAppById(appId, tile?.dataset.appName);
 });
 
 // Apps (gerenciar)
@@ -1432,8 +1517,17 @@ localToggle.addEventListener("click", () => {
 });
 
 localPair.addEventListener("click", () => void pairLocal());
+localDiscover.addEventListener("click", () => void discoverLocalTvs());
 localForget.addEventListener("click", () => void forgetLocal());
 localEnabled.addEventListener("change", () => void toggleLocalEnabled());
+
+localFound.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-discover-host]");
+  const host = button?.dataset.discoverHost;
+  if (!host) return;
+  selectFoundHost(host);
+  toast(`TV selecionada: ${host}. Clique em “Parear com a TV”.`, "info");
+});
 
 aboutToggle.addEventListener("click", () => {
   aboutCollapsed = !aboutCollapsed;

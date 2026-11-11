@@ -1,7 +1,10 @@
 //! Comandos expostos ao frontend.
 
+use std::time::Duration;
+
 use tauri::{AppHandle, State};
 
+use crate::discovery;
 use crate::local::{self, LocalApp, LocalState, LocalStatus};
 use crate::smartthings::{self, StDevice, StInput, StStatus};
 
@@ -111,6 +114,24 @@ pub async fn st_about(app: AppHandle) -> Result<smartthings::StAbout, String> {
 // Conexão direta com a TV (rede local)
 // ---------------------------------------------------------------------------
 
+/// Busca TVs Samsung na rede (SSDP) e devolve IP + nome/modelo de cada uma.
+#[tauri::command]
+pub async fn local_discover(
+    app: AppHandle,
+    timeout_ms: Option<u64>,
+) -> Result<Vec<discovery::DiscoveredTv>, String> {
+    let timeout = Duration::from_millis(timeout_ms.unwrap_or(4000).clamp(1000, 15000));
+    let mut found = discovery::discover(timeout).await;
+
+    // Marca a TV que já está pareada neste aparelho, se aparecer na lista.
+    let cfg = local::load(&app);
+    for tv in &mut found {
+        tv.paired = cfg.token.is_some() && cfg.host.as_deref() == Some(tv.host.as_str());
+    }
+
+    Ok(found)
+}
+
 #[tauri::command]
 pub async fn local_status(
     app: AppHandle,
@@ -162,8 +183,9 @@ pub async fn local_launch(
     app: AppHandle,
     state: State<'_, LocalState>,
     app_id: String,
+    name: Option<String>,
 ) -> Result<(), String> {
-    local::launch(&app, &state, &app_id).await
+    local::launch(&app, &state, &app_id, name.as_deref()).await
 }
 
 #[tauri::command]

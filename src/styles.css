@@ -236,6 +236,30 @@ body {
   min-width: 30px;
 }
 
+/* TVs encontradas na busca da rede (SSDP) */
+#local-found {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+#local-found .found-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#local-found .found-name {
+  font-weight: 600;
+}
+
+#local-found .found-meta {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
 .st-collapsed .card-head {
   margin-bottom: 0;
 }

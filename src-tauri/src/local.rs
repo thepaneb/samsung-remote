@@ -518,26 +518,229 @@ pub async fn set_channel(
     send_key(app, state, "KEY_ENTER").await
 }
 
+// ---------------------------------------------------------------------------
+// Abrir apps pela API REST local (com o evento WebSocket como reserva)
+// ---------------------------------------------------------------------------
+
+enum RestRun {
+    /// A TV confirmou a abertura (HTTP 2xx).
+    Accepted,
+    /// A TV não tem esse app (HTTP 404).
+    NotFound,
+    /// A API respondeu, mas com erro (HTTP != 2xx).
+    Rejected(String),
+    /// A API REST não respondeu (modelo sem suporte ou fora do ar).
+    Unsupported,
+}
+
+fn rest_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        // o certificado da TV é autoassinado (porta 8002)
+        .danger_accept_invalid_certs(true)
+        .timeout(Duration::from_secs(4))
+        .build()
+        .map_err(|e| format!("Falha ao preparar o cliente HTTP: {e}"))
+}
+
+/// Pede à TV para abrir o app pela API REST (8001 http / 8002 https).
+async fn rest_launch(client: &reqwest::Client, host: &str, app_id: &str) -> RestRun {
+    let path = format!("/api/v2/applications/{app_id}");
+    let mut last = String::new();
+    let mut responded = false;
+
+    for base in [format!("http://{host}:8001"), format!("https://{host}:8002")] {
+        match client.post(format!("{base}{path}")).send().await {
+            Ok(response) => {
+                responded = true;
+                let status = response.status();
+                if status.is_success() {
+                    return RestRun::Accepted;
+                }
+                if status.as_u16() == 404 {
+                    return RestRun::NotFound;
+                }
+                last = format!("HTTP {status}");
+            }
+            Err(e) => last = e.to_string(),
+        }
+    }
+
+    if responded {
+        RestRun::Rejected(last)
+    } else {
+        RestRun::Unsupported
+    }
+}
+
+/// Estado do app pela API REST: `Some(true)` rodando/visível, `Some(false)`
+/// parado, `None` sem resposta (não dá para verificar).
+async fn rest_app_running(client: &reqwest::Client, host: &str, app_id: &str) -> Option<bool> {
+    let path = format!("/api/v2/applications/{app_id}");
+    let mut responded = false;
+
+    for base in [format!("http://{host}:8001"), format!("https://{host}:8002")] {
+        if let Ok(response) = client.get(format!("{base}{path}")).send().await {
+            responded = true;
+            if let Ok(value) = response.json::<Value>().await {
+                let running = value.get("running").and_then(Value::as_bool).unwrap_or(false);
+                let visible = value.get("visible").and_then(Value::as_bool).unwrap_or(false);
+                return Some(running || visible);
+            }
+        }
+    }
+
+    if responded {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+/// Espera o app aparecer como rodando (a TV leva 1–2s para subir o processo).
+async fn wait_app_running(
+    client: &reqwest::Client,
+    host: &str,
+    app_id: &str,
+    timeout: Duration,
+) -> Option<bool> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    loop {
+        match rest_app_running(client, host, app_id).await {
+            Some(true) => return Some(true),
+            Some(false) => {
+                if tokio::time::Instant::now() >= deadline {
+                    return Some(false);
+                }
+                tokio::time::sleep(Duration::from_millis(400)).await;
+            }
+            None => return None,
+        }
+    }
+}
+
+/// Normaliza um nome para comparação (minúsculas, sem espaços nas pontas).
+fn normalize_name(value: &str) -> String {
+    value.trim().to_lowercase()
+}
+
+/// Escolhe o ID instalado mais provável para o app pedido: mantém o ID quando
+/// ele existe na lista da TV; senão tenta casar pelo nome (exato ou prefixo
+/// único) — atalhos salvos podem ter o ID de outra região/ano.
+fn resolve_app_id(apps: &[LocalApp], app_id: &str, name: Option<&str>) -> String {
+    if apps.is_empty() || apps.iter().any(|a| a.app_id == app_id) {
+        return app_id.to_string();
+    }
+    let Some(name) = name else {
+        return app_id.to_string();
+    };
+    let target = normalize_name(name);
+    if target.is_empty() {
+        return app_id.to_string();
+    }
+
+    if let Some(exact) = apps.iter().find(|a| normalize_name(&a.name) == target) {
+        return exact.app_id.clone();
+    }
+
+    let starts: Vec<&LocalApp> = apps
+        .iter()
+        .filter(|a| normalize_name(&a.name).starts_with(&target))
+        .collect();
+    if starts.len() == 1 {
+        return starts[0].app_id.clone();
+    }
+
+    let inside: Vec<&LocalApp> = apps
+        .iter()
+        .filter(|a| target.starts_with(&normalize_name(&a.name)))
+        .collect();
+    if inside.len() == 1 {
+        return inside[0].app_id.clone();
+    }
+
+    app_id.to_string()
+}
+
+fn launch_payload(app_id: &str) -> String {
+    json!({
+        "method": "ms.channel.emit",
+        "params": {
+            "event": "ed.apps.launch",
+            "to": "host",
+            "data": {
+                "action_type": "DEEP_LINK",
+                "appId": app_id,
+                "metaTag": ""
+            }
+        }
+    })
+    .to_string()
+}
+
 /// Abre um app instalado pelo ID.
-pub async fn launch(app: &AppHandle, state: &LocalState, app_id: &str) -> Result<(), String> {
-    send_json(
-        app,
-        state,
-        json!({
-            "method": "ms.channel.emit",
-            "params": {
-                "event": "ed.apps.launch",
-                "to": "host",
-                "data": {
-                    "action_type": "DEEP_LINK",
-                    "appId": app_id,
-                    "metaTag": ""
+///
+/// Caminho principal: a **API REST local** da TV (`POST /api/v2/applications/<id>`),
+/// que confirma na hora (2xx = abriu; 404 = o ID não existe neste modelo). Nesta
+/// geração de TVs o evento WebSocket `ed.apps.launch` é ignorado silenciosamente —
+/// por isso ele ficou como reserva para modelos sem a API REST.
+///
+/// Se o ID não existir (404), atualiza a lista real de apps da TV e tenta casar
+/// pelo nome — cobre atalhos salvos com IDs de outra região/ano.
+pub async fn launch(
+    app: &AppHandle,
+    state: &LocalState,
+    app_id: &str,
+    name: Option<&str>,
+) -> Result<(), String> {
+    let cfg = load(app);
+    let host = cfg
+        .host
+        .clone()
+        .ok_or("Informe o IP da TV na conexão direta.")?;
+    let client = rest_client()?;
+
+    let resolved = resolve_app_id(&cached_apps(app), app_id, name);
+
+    match rest_launch(&client, &host, &resolved).await {
+        RestRun::Accepted => Ok(()),
+
+        // Modelo antigo (sem API REST): evento WebSocket, sem como verificar.
+        RestRun::Unsupported => {
+            send_json(app, state, launch_payload(&resolved)).await?;
+            Ok(())
+        }
+
+        // ID não existe nesta TV: com o nome em mãos, atualiza a lista real e
+        // tenta o ID correspondente (ex.: "Netflix" com ID de outra região).
+        RestRun::NotFound => {
+            if let Some(name) = name {
+                if let Ok(fresh) = apps(app, state).await {
+                    let retry = resolve_app_id(&fresh, app_id, Some(name));
+                    if retry != resolved {
+                        if let RestRun::Accepted = rest_launch(&client, &host, &retry).await {
+                            return Ok(());
+                        }
+                    }
                 }
             }
-        })
-        .to_string(),
-    )
-    .await
+
+            let label = name.unwrap_or(resolved.as_str());
+            Err(format!(
+                "A TV não tem o app “{label}” instalado (ID {app_id}). Use “Carregar da TV” para ver os apps reais do seu modelo."
+            ))
+        }
+
+        // A API respondeu com erro: ainda tenta o evento WebSocket e confere
+        // o resultado pelo estado do app.
+        RestRun::Rejected(reason) => {
+            send_json(app, state, launch_payload(&resolved)).await?;
+            match wait_app_running(&client, &host, &resolved, Duration::from_secs(4)).await {
+                Some(true) => Ok(()),
+                Some(false) => Err(format!("A TV não abriu o app ({reason}).")),
+                None => Ok(()),
+            }
+        }
+    }
 }
 
 /// Digita um texto na TV (vai para o campo em foco, como o teclado da TV).

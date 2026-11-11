@@ -5,20 +5,59 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+pnpm-error.log*
 lerna-debug.log*
 
+# Dependências
 node_modules
+
+# Build do frontend
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/schemas/
+*.rs.bk
+
+# Bundles gerados (instaladores locais)
+*.msi
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.apk
+*.aab
+
+# Android: chaves e segredos — NUNCA versionar
+*.jks
+*.keystore
+key.properties
+keystore.properties
+local.properties
+src-tauri/android-key/
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# Dados locais do app (tokens ficam na pasta de dados do SO, fora do repo)
+local.json
+smartthings.json
+
+# Editor / IDE
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# SO
+.DS_Store
+Thumbs.db
